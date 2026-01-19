@@ -267,6 +267,32 @@ export const walletStats = pgTable(
 );
 
 // ============================================
+// Hourly Stats Table (for volume & activity metrics)
+// ============================================
+
+export const hourlyStats = pgTable(
+  'hourly_stats',
+  {
+    id: serial('id').primaryKey(),
+    hour: timestamp('hour', { withTimezone: true }).notNull(),
+    token: varchar('token', { length: 10 }).notNull(), // 'USDC', 'EURC', 'USYC'
+
+    transferCount: integer('transfer_count').notNull().default(0),
+    totalVolume: decimal('total_volume', { precision: 38, scale: 0 }).notNull().default('0'),
+    uniqueSenders: integer('unique_senders').notNull().default(0),
+    uniqueReceivers: integer('unique_receivers').notNull().default(0),
+    medianAmount: decimal('median_amount', { precision: 38, scale: 0 }),
+    p90Amount: decimal('p90_amount', { precision: 38, scale: 0 }),
+    minAmount: decimal('min_amount', { precision: 38, scale: 0 }),
+    maxAmount: decimal('max_amount', { precision: 38, scale: 0 }),
+  },
+  (table) => [
+    uniqueIndex('hourly_stats_hour_token_idx').on(table.hour, table.token),
+    index('hourly_stats_hour_idx').on(table.hour),
+  ]
+);
+
+// ============================================
 // FX Daily Stats Table
 // ============================================
 
@@ -363,6 +389,9 @@ export type NewWalletStat = typeof walletStats.$inferInsert;
 
 export type FXDailyStat = typeof fxDailyStats.$inferSelect;
 export type NewFXDailyStat = typeof fxDailyStats.$inferInsert;
+
+export type HourlyStat = typeof hourlyStats.$inferSelect;
+export type NewHourlyStat = typeof hourlyStats.$inferInsert;
 
 export type Chain = typeof chains.$inferSelect;
 export type NewChain = typeof chains.$inferInsert;

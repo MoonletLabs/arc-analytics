@@ -97,7 +97,7 @@ export const TESTNET_CHAINS: Record<string, ChainConfig> = {
     gatewayMinter: ARC_TESTNET_CONFIG.gatewayMinter,
   },
   
-  // Ethereum Sepolia - Major chain for CCTP V2
+  // Ethereum Sepolia - Both V1 and V2 contracts
   ethereum_sepolia: {
     id: 'ethereum_sepolia',
     name: 'Ethereum Sepolia',
@@ -108,14 +108,17 @@ export const TESTNET_CHAINS: Record<string, ChainConfig> = {
     explorerUrl: 'https://sepolia.etherscan.io',
     rpcUrl: 'https://rpc.sepolia.org',
     blockTime: 12,
-    cctpVersion: 2 as CCTPVersion,
+    // V1 contracts
+    tokenMessenger: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5' as `0x${string}`,
+    messageTransmitter: '0x7865fAfC2db2093669d92c0F33AeEF291086BEFD' as `0x${string}`,
+    // V2 contracts
     tokenMessengerV2: '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA' as `0x${string}`,
     messageTransmitterV2: '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`,
     tokenMinterV2: '0xb43db544E2c27092c107639Ad201b3dEfAbcF192' as `0x${string}`,
     usdc: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`,
   },
   
-  // Arbitrum Sepolia - Major chain for CCTP V2
+  // Arbitrum Sepolia - Both V1 and V2 contracts
   arbitrum_sepolia: {
     id: 'arbitrum_sepolia',
     name: 'Arbitrum Sepolia',
@@ -126,14 +129,17 @@ export const TESTNET_CHAINS: Record<string, ChainConfig> = {
     explorerUrl: 'https://sepolia.arbiscan.io',
     rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc',
     blockTime: 0.25,
-    cctpVersion: 2 as CCTPVersion,
+    // V1 contracts
+    tokenMessenger: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5' as `0x${string}`,
+    messageTransmitter: '0xaCF1ceeF35caAc005e15888dDb8A3515C41B4872' as `0x${string}`,
+    // V2 contracts
     tokenMessengerV2: '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA' as `0x${string}`,
     messageTransmitterV2: '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`,
     tokenMinterV2: '0xb43db544E2c27092c107639Ad201b3dEfAbcF192' as `0x${string}`,
     usdc: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d' as `0x${string}`,
   },
   
-  // Base Sepolia - Major chain for CCTP V2
+  // Base Sepolia - Both V1 and V2 contracts
   base_sepolia: {
     id: 'base_sepolia',
     name: 'Base Sepolia',
@@ -144,7 +150,10 @@ export const TESTNET_CHAINS: Record<string, ChainConfig> = {
     explorerUrl: 'https://sepolia.basescan.org',
     rpcUrl: 'https://sepolia.base.org',
     blockTime: 2,
-    cctpVersion: 2 as CCTPVersion,
+    // V1 contracts
+    tokenMessenger: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5' as `0x${string}`,
+    messageTransmitter: '0x7865fAfC2db2093669d92c0F33AeEF291086BEFD' as `0x${string}`,
+    // V2 contracts
     tokenMessengerV2: '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA' as `0x${string}`,
     messageTransmitterV2: '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`,
     tokenMinterV2: '0xb43db544E2c27092c107639Ad201b3dEfAbcF192' as `0x${string}`,

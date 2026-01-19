@@ -36,6 +36,46 @@ export const statsApi = {
   
   getPerformance: (token?: string) =>
     fetchApi<{ data: PerformanceStats }>(`/stats/performance${token ? `?token=${token}` : ''}`),
+
+  // Volume & Activity endpoints
+  getHourlyVolume: (token?: string, hours = 168) =>
+    fetchApi<{ data: HourlyStat[]; source: string }>(`/stats/volume/hourly?hours=${hours}${token ? `&token=${token}` : ''}`),
+  
+  getTransferMetrics: (token?: string, days = 7) =>
+    fetchApi<{ data: TransferMetrics }>(`/stats/transfers/metrics?days=${days}${token ? `&token=${token}` : ''}`),
+  
+  getDailyWallets: (token?: string, days = 30) =>
+    fetchApi<{ data: DailyWalletStat[] }>(`/stats/wallets/daily?days=${days}${token ? `&token=${token}` : ''}`),
+
+  // Net Flows endpoints
+  getNetFlows: (token?: string, days = 7, limit = 100) =>
+    fetchApi<{ data: NetFlowEntry[]; period: { days: number; since: string } }>(`/stats/flows/net?days=${days}&limit=${limit}${token ? `&token=${token}` : ''}`),
+  
+  getTopSinks: (token?: string, days = 7, limit = 20) =>
+    fetchApi<{ data: NetFlowEntry[]; period: { days: number; since: string } }>(`/stats/flows/top-sinks?days=${days}&limit=${limit}${token ? `&token=${token}` : ''}`),
+  
+  getTopSources: (token?: string, days = 7, limit = 20) =>
+    fetchApi<{ data: NetFlowEntry[]; period: { days: number; since: string } }>(`/stats/flows/top-sources?days=${days}&limit=${limit}${token ? `&token=${token}` : ''}`),
+
+  // Velocity & Retention endpoints
+  getVelocity: (token?: string, days = 7) =>
+    fetchApi<{ data: VelocityData[]; period: { days: number; since: string } }>(`/stats/velocity?days=${days}${token ? `&token=${token}` : ''}`),
+
+  getDormancy: (token?: string) =>
+    fetchApi<{ data: DormancyData[] }>(`/stats/dormancy${token ? `?token=${token}` : ''}`),
+
+  getWalletRetention: (token?: string, days = 14) =>
+    fetchApi<{ data: WalletRetentionEntry[]; period: { days: number } }>(`/stats/wallet-retention?days=${days}${token ? `&token=${token}` : ''}`),
+
+  // Concentration & Risk endpoints
+  getTopHolders: (token?: string, top = 10, days = 30) =>
+    fetchApi<{ data: TopHoldersData[]; period: { days: number; since: string } }>(`/stats/concentration/top-holders?top=${top}&days=${days}${token ? `&token=${token}` : ''}`),
+
+  getHHI: (token?: string, days = 30) =>
+    fetchApi<{ data: HHIData[]; period: { days: number; since: string }; interpretation: Record<string, string> }>(`/stats/concentration/hhi?days=${days}${token ? `&token=${token}` : ''}`),
+
+  getWhaleAlerts: (token?: string, days = 7, threshold?: string, limit = 50) =>
+    fetchApi<{ data: WhaleAlertsResponse; period: { days: number; since: string }; threshold: { raw: string; formatted: string } }>(`/stats/whale-alerts?days=${days}&limit=${limit}${token ? `&token=${token}` : ''}${threshold ? `&threshold=${threshold}` : ''}`),
 };
 
 // Transfers API
@@ -260,4 +300,154 @@ export interface PaginatedResponse<T> {
     total: number;
     totalPages: number;
   };
+}
+
+// Volume & Activity Types
+export interface HourlyStat {
+  hour: string;
+  token: string;
+  transferCount: number;
+  totalVolume: string;
+  uniqueSenders: number;
+  uniqueReceivers: number;
+  minAmount: string;
+  maxAmount: string;
+  medianAmount?: string;
+  p90Amount?: string;
+}
+
+export interface TransferMetrics {
+  byToken: TokenMetrics[];
+  wallets: {
+    uniqueSenders: number;
+    uniqueReceivers: number;
+    totalUniqueWallets: number;
+  };
+  period: {
+    days: number;
+    since: string;
+  };
+}
+
+export interface TokenMetrics {
+  token: string;
+  transferCount: number;
+  totalVolume: string;
+  totalVolumeFormatted: string;
+  avgAmount: string;
+  avgAmountFormatted: string;
+  medianAmount: string;
+  medianAmountFormatted: string;
+  p90Amount: string;
+  p90AmountFormatted: string;
+  p10Amount: string;
+  p10AmountFormatted: string;
+  minAmount: string;
+  maxAmount: string;
+}
+
+export interface DailyWalletStat {
+  date: string;
+  token: string;
+  unique_senders: number;
+  unique_receivers: number;
+  transfer_count: number;
+}
+
+// Net Flows Types
+export interface NetFlowEntry {
+  address: string;
+  token: string;
+  inflow: string;
+  inflowFormatted: string;
+  outflow: string;
+  outflowFormatted: string;
+  netFlow: string;
+  netFlowFormatted: string;
+  inflowCount: number;
+  outflowCount: number;
+}
+
+// Velocity & Retention Types
+export interface VelocityData {
+  token: string;
+  totalVolume: string;
+  totalVolumeFormatted: string;
+  transferCount: number;
+  activeSupply: string;
+  activeSupplyFormatted: string;
+  activeWallets: number;
+  velocity: string;
+  velocityDescription: string;
+}
+
+export interface DormancyData {
+  threshold: number;
+  data: DormancyEntry[];
+}
+
+export interface DormancyEntry {
+  token: string;
+  totalWallets: number;
+  dormantWallets: number;
+  dormancyRate: string;
+}
+
+export interface WalletRetentionEntry {
+  date: string;
+  token: string;
+  totalActive: number;
+  newWallets: number;
+  returningWallets: number;
+  retentionRate: string;
+}
+
+// Concentration & Risk Types
+export interface TopHoldersData {
+  token: string;
+  totalSupply: string;
+  totalSupplyFormatted: string;
+  totalHolders: number;
+  top10Share: string;
+  top50Share: string;
+  holders: HolderEntry[];
+}
+
+export interface HolderEntry {
+  rank: number;
+  address: string;
+  balance: string;
+  balanceFormatted: string;
+  sharePct: string;
+}
+
+export interface HHIData {
+  token: string;
+  hhi: string;
+  holderCount: number;
+  minHhi: string;
+  concentration: string;
+}
+
+export interface WhaleAlertsResponse {
+  transfers: WhaleTransfer[];
+  summary: {
+    count: number;
+    totalVolume: string;
+    totalVolumeFormatted: string;
+    avgSize: string;
+    avgSizeFormatted: string;
+  };
+}
+
+export interface WhaleTransfer {
+  id: string;
+  token: string;
+  amount: string;
+  amountFormatted: string;
+  fromAddress: string;
+  toAddress: string;
+  txHash: string;
+  blockNumber: number;
+  timestamp: string;
 }

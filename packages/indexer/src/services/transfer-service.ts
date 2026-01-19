@@ -23,6 +23,7 @@ import {
   type ChainConfig,
   formatAmount,
   getChainByDomain,
+  getChainById,
   DOMAIN_TO_CHAIN,
   TOKEN_DECIMALS,
 } from '@usdc-eurc-analytics/shared';
@@ -82,7 +83,7 @@ export class TransferService {
     indexer: EvmChainIndexer
   ): Promise<number> {
     let processed = 0;
-    const sourceChain = getChainByDomain(indexer.isV2 ? 26 : 0); // Get proper domain
+    const sourceChain = getChainById(sourceChainId);
 
     for (const event of events) {
       const token = indexer.getTokenType(event.burnToken);
@@ -469,6 +470,45 @@ export class TransferService {
         total_volume = EXCLUDED.total_volume,
         unique_traders = EXCLUDED.unique_traders,
         avg_rate = EXCLUDED.avg_rate
+    `);
+  }
+
+  /**
+   * Update hourly statistics for native transfers
+   */
+  async updateHourlyStats(hour: Date): Promise<void> {
+    const hourStr = hour.toISOString();
+    const hourStart = new Date(hour);
+    hourStart.setMinutes(0, 0, 0);
+    const hourEnd = new Date(hourStart.getTime() + 60 * 60 * 1000);
+
+    await this.db.execute(sql`
+      INSERT INTO hourly_stats (hour, token, transfer_count, total_volume, unique_senders, unique_receivers, min_amount, max_amount, median_amount, p90_amount)
+      SELECT 
+        date_trunc('hour', timestamp) as hour,
+        token,
+        COUNT(*) as transfer_count,
+        COALESCE(SUM(amount::numeric), 0) as total_volume,
+        COUNT(DISTINCT from_address) as unique_senders,
+        COUNT(DISTINCT to_address) as unique_receivers,
+        COALESCE(MIN(amount::numeric), 0) as min_amount,
+        COALESCE(MAX(amount::numeric), 0) as max_amount,
+        COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY amount::numeric), 0) as median_amount,
+        COALESCE(percentile_cont(0.90) WITHIN GROUP (ORDER BY amount::numeric), 0) as p90_amount
+      FROM arc_native_transfers
+      WHERE timestamp >= ${hourStart.toISOString()}::timestamp
+        AND timestamp < ${hourEnd.toISOString()}::timestamp
+      GROUP BY date_trunc('hour', timestamp), token
+      ON CONFLICT (hour, token)
+      DO UPDATE SET
+        transfer_count = EXCLUDED.transfer_count,
+        total_volume = EXCLUDED.total_volume,
+        unique_senders = EXCLUDED.unique_senders,
+        unique_receivers = EXCLUDED.unique_receivers,
+        min_amount = EXCLUDED.min_amount,
+        max_amount = EXCLUDED.max_amount,
+        median_amount = EXCLUDED.median_amount,
+        p90_amount = EXCLUDED.p90_amount
     `);
   }
 

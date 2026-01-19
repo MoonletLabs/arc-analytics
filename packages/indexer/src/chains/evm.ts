@@ -14,8 +14,6 @@ import {
   type DepositForBurnV2Event,
   type MintAndWithdrawEvent,
   bytes32ToAddress,
-  getCCTPVersion,
-  getTokenMessenger,
 } from '@usdc-eurc-analytics/shared';
 
 // ============================================
@@ -59,12 +57,18 @@ export class EvmChainIndexer {
   private client: PublicClient;
   private chainConfig: ChainConfig & { rpcUrl: string };
   private batchSize: number;
-  private cctpVersion: 1 | 2;
+  
+  // Track which contract versions are available
+  private hasV1: boolean;
+  private hasV2: boolean;
 
   constructor(options: EvmIndexerOptions) {
     this.chainConfig = options.chainConfig;
     this.batchSize = options.batchSize;
-    this.cctpVersion = getCCTPVersion(options.chainConfig);
+    
+    // Determine which contract versions are available
+    this.hasV1 = !!options.chainConfig.tokenMessenger;
+    this.hasV2 = !!options.chainConfig.tokenMessengerV2;
 
     this.client = createPublicClient({
       transport: http(options.chainConfig.rpcUrl, {
@@ -82,8 +86,12 @@ export class EvmChainIndexer {
     return this.chainConfig.name;
   }
 
-  get isV2(): boolean {
-    return this.cctpVersion === 2;
+  get supportsV1(): boolean {
+    return this.hasV1;
+  }
+
+  get supportsV2(): boolean {
+    return this.hasV2;
   }
 
   /**
@@ -103,85 +111,64 @@ export class EvmChainIndexer {
   }
 
   /**
-   * Get the token messenger address for this chain
+   * Get V1 token messenger address
    */
-  getTokenMessengerAddress(): `0x${string}` | undefined {
-    return getTokenMessenger(this.chainConfig);
+  getTokenMessengerV1(): `0x${string}` | undefined {
+    return this.chainConfig.tokenMessenger;
   }
 
   /**
-   * Index events from a block range
+   * Get V2 token messenger address
+   */
+  getTokenMessengerV2(): `0x${string}` | undefined {
+    return this.chainConfig.tokenMessengerV2;
+  }
+
+  /**
+   * Index events from a block range - queries BOTH V1 and V2 contracts if available
    */
   async indexBlockRange(fromBlock: number, toBlock: number): Promise<IndexedEvents> {
     const burns: (DepositForBurnEvent | DepositForBurnV2Event)[] = [];
     const mints: MintAndWithdrawEvent[] = [];
+    const isDebug = process.env.DEBUG === 'true';
 
-    const tokenMessenger = this.getTokenMessengerAddress();
-    if (!tokenMessenger) {
+    // Check if any contracts are configured
+    if (!this.hasV1 && !this.hasV2) {
       console.warn(`[${this.chainId}] No token messenger configured!`);
       return { burns, mints, lastBlock: toBlock };
     }
 
-    const isDebug = process.env.DEBUG === 'true';
     if (isDebug) {
-      console.log(`[${this.chainId}] Using TokenMessenger${this.isV2 ? 'V2' : ''}: ${tokenMessenger}`);
-      console.log(`[${this.chainId}] CCTP Version: ${this.cctpVersion}`);
+      const versions = [];
+      if (this.hasV1) versions.push(`V1: ${this.chainConfig.tokenMessenger}`);
+      if (this.hasV2) versions.push(`V2: ${this.chainConfig.tokenMessengerV2}`);
+      console.log(`[${this.chainId}] Indexing contracts: ${versions.join(', ')}`);
     }
 
-    // Fetch burn events (DepositForBurn)
-    const burnEvent = this.isV2 ? DEPOSIT_FOR_BURN_EVENT_V2 : DEPOSIT_FOR_BURN_EVENT_V1;
-    
-    try {
-      const burnLogs = await this.client.getLogs({
-        address: tokenMessenger,
-        event: burnEvent,
-        fromBlock: BigInt(fromBlock),
-        toBlock: BigInt(toBlock),
-      });
-
-      if (isDebug && burnLogs.length > 0) {
-        console.log(`[${this.chainId}] Found ${burnLogs.length} burn logs`);
-      }
-
-      for (const log of burnLogs) {
-        const timestamp = await this.getBlockTimestamp(log.blockNumber);
-        const event = this.parseBurnEvent(log, timestamp);
-        if (event) {
-          burns.push(event);
-          if (isDebug) {
-            console.log(`[${this.chainId}] Parsed burn: nonce=${event.nonce}, amount=${event.amount}, dest=${event.destinationDomain}`);
-          }
-        }
-      }
-    } catch (error) {
-      console.error(`[${this.chainId}] Error fetching burn logs:`, error);
+    // Index V1 contracts if available
+    if (this.hasV1 && this.chainConfig.tokenMessenger) {
+      await this.indexContractEvents(
+        this.chainConfig.tokenMessenger,
+        1, // V1
+        fromBlock,
+        toBlock,
+        burns,
+        mints,
+        isDebug
+      );
     }
 
-    // Fetch mint events (MintAndWithdraw)
-    try {
-      const mintLogs = await this.client.getLogs({
-        address: tokenMessenger,
-        event: MINT_AND_WITHDRAW_EVENT,
-        fromBlock: BigInt(fromBlock),
-        toBlock: BigInt(toBlock),
-      });
-
-      if (isDebug && mintLogs.length > 0) {
-        console.log(`[${this.chainId}] Found ${mintLogs.length} mint logs`);
-      }
-
-      for (const log of mintLogs) {
-        const timestamp = await this.getBlockTimestamp(log.blockNumber);
-        const event = this.parseMintEvent(log, timestamp);
-        if (event) {
-          mints.push(event);
-          if (isDebug) {
-            console.log(`[${this.chainId}] Parsed mint: recipient=${event.mintRecipient}, amount=${event.amount}`);
-          }
-        }
-      }
-    } catch (error) {
-      console.error(`[${this.chainId}] Error fetching mint logs:`, error);
+    // Index V2 contracts if available
+    if (this.hasV2 && this.chainConfig.tokenMessengerV2) {
+      await this.indexContractEvents(
+        this.chainConfig.tokenMessengerV2,
+        2, // V2
+        fromBlock,
+        toBlock,
+        burns,
+        mints,
+        isDebug
+      );
     }
 
     return {
@@ -192,11 +179,83 @@ export class EvmChainIndexer {
   }
 
   /**
+   * Index events from a specific contract (V1 or V2)
+   */
+  private async indexContractEvents(
+    contractAddress: `0x${string}`,
+    version: 1 | 2,
+    fromBlock: number,
+    toBlock: number,
+    burns: (DepositForBurnEvent | DepositForBurnV2Event)[],
+    mints: MintAndWithdrawEvent[],
+    isDebug: boolean
+  ): Promise<void> {
+    const versionLabel = `V${version}`;
+
+    // Fetch burn events (DepositForBurn)
+    const burnEvent = version === 2 ? DEPOSIT_FOR_BURN_EVENT_V2 : DEPOSIT_FOR_BURN_EVENT_V1;
+    
+    try {
+      const burnLogs = await this.client.getLogs({
+        address: contractAddress,
+        event: burnEvent,
+        fromBlock: BigInt(fromBlock),
+        toBlock: BigInt(toBlock),
+      });
+
+      if (isDebug && burnLogs.length > 0) {
+        console.log(`[${this.chainId}] Found ${burnLogs.length} ${versionLabel} burn logs`);
+      }
+
+      for (const log of burnLogs) {
+        const timestamp = await this.getBlockTimestamp(log.blockNumber);
+        const event = this.parseBurnEvent(log, timestamp, version);
+        if (event) {
+          burns.push(event);
+          if (isDebug) {
+            console.log(`[${this.chainId}] Parsed ${versionLabel} burn: nonce=${event.nonce}, amount=${event.amount}, dest=${event.destinationDomain}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`[${this.chainId}] Error fetching ${versionLabel} burn logs:`, error);
+    }
+
+    // Fetch mint events (MintAndWithdraw)
+    try {
+      const mintLogs = await this.client.getLogs({
+        address: contractAddress,
+        event: MINT_AND_WITHDRAW_EVENT,
+        fromBlock: BigInt(fromBlock),
+        toBlock: BigInt(toBlock),
+      });
+
+      if (isDebug && mintLogs.length > 0) {
+        console.log(`[${this.chainId}] Found ${mintLogs.length} ${versionLabel} mint logs`);
+      }
+
+      for (const log of mintLogs) {
+        const timestamp = await this.getBlockTimestamp(log.blockNumber);
+        const event = this.parseMintEvent(log, timestamp, version);
+        if (event) {
+          mints.push(event);
+          if (isDebug) {
+            console.log(`[${this.chainId}] Parsed ${versionLabel} mint: recipient=${event.mintRecipient}, amount=${event.amount}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`[${this.chainId}] Error fetching ${versionLabel} mint logs:`, error);
+    }
+  }
+
+  /**
    * Parse a DepositForBurn event log (handles both V1 and V2)
    */
-  private parseBurnEvent(log: Log, timestamp: number): DepositForBurnEvent | DepositForBurnV2Event | null {
+  private parseBurnEvent(log: Log, timestamp: number, version: 1 | 2): DepositForBurnEvent | DepositForBurnV2Event | null {
     try {
-      const abi = this.isV2 ? TOKEN_MESSENGER_V2_ABI : TOKEN_MESSENGER_ABI;
+      const isV2 = version === 2;
+      const abi = isV2 ? TOKEN_MESSENGER_V2_ABI : TOKEN_MESSENGER_ABI;
       
       const decoded = decodeEventLog({
         abi,
@@ -205,7 +264,7 @@ export class EvmChainIndexer {
         eventName: 'DepositForBurn',
       });
 
-      if (this.isV2) {
+      if (isV2) {
         // V2 event parsing
         const args = decoded.args as {
           nonce: bigint;
@@ -269,9 +328,9 @@ export class EvmChainIndexer {
   /**
    * Parse a MintAndWithdraw event log
    */
-  private parseMintEvent(log: Log, timestamp: number): MintAndWithdrawEvent | null {
+  private parseMintEvent(log: Log, timestamp: number, version: 1 | 2): MintAndWithdrawEvent | null {
     try {
-      const abi = this.isV2 ? TOKEN_MESSENGER_V2_ABI : TOKEN_MESSENGER_ABI;
+      const abi = version === 2 ? TOKEN_MESSENGER_V2_ABI : TOKEN_MESSENGER_ABI;
       
       const decoded = decodeEventLog({
         abi,

@@ -1,4 +1,15 @@
 import 'dotenv/config';
+
+// Check if indexer is disabled (use dummy data mode)
+if (process.env.INDEXER_DISABLED === 'true') {
+  console.log('\n========================================');
+  console.log('   Indexer DISABLED (using dummy data)  ');
+  console.log('========================================\n');
+  console.log('To enable the indexer, remove INDEXER_DISABLED from .env');
+  console.log('To populate with dummy data, run: pnpm db:seed\n');
+  process.exit(0);
+}
+
 import { getDb } from '@usdc-eurc-analytics/db';
 import { sleep } from '@usdc-eurc-analytics/shared';
 import { config } from './config.js';
@@ -125,6 +136,21 @@ class Indexer {
     console.log(`  USYC:           ${this.usycIndexer ? `${LOG_COLORS.green}enabled${LOG_COLORS.reset}` : `${LOG_COLORS.gray}disabled${LOG_COLORS.reset}`}`);
     console.log(`  StableFX:       ${this.stableFXIndexer ? `${LOG_COLORS.green}enabled${LOG_COLORS.reset}` : `${LOG_COLORS.gray}disabled${LOG_COLORS.reset}`}`);
     console.log('');
+    
+    if (config.arcConfig) {
+      console.log(`${LOG_COLORS.cyan}Arc Token Addresses:${LOG_COLORS.reset}`);
+      console.log(`  USDC:           ${config.arcConfig.usdc}`);
+      console.log(`  EURC:           ${config.arcConfig.eurc || 'not configured'}`);
+      console.log(`  USYC:           ${config.arcConfig.usyc || 'not configured'}`);
+      console.log(`  FX Escrow:      ${config.arcConfig.fxEscrow || 'not configured'}`);
+      console.log('');
+      console.log(`${LOG_COLORS.cyan}Excluded Addresses (CCTP/Gateway):${LOG_COLORS.reset}`);
+      console.log(`  TokenMessenger: ${config.arcConfig.tokenMessengerV2 || config.arcConfig.tokenMessenger || 'none'}`);
+      console.log(`  TokenMinter:    ${config.arcConfig.tokenMinterV2 || 'none'}`);
+      console.log(`  Gateway Wallet: ${config.arcConfig.gatewayWallet || 'none'}`);
+      console.log(`  Gateway Minter: ${config.arcConfig.gatewayMinter || 'none'}`);
+      console.log('');
+    }
     console.log(`${LOG_COLORS.gray}Starting indexing loop...${LOG_COLORS.reset}`);
     console.log('');
 
@@ -281,29 +307,36 @@ class Indexer {
 
       let totalProcessed = 0;
 
+      // Log summary of what was found
+      logInfo(prefix, `Found: USDC=${results.usdc.transfers.length}, EURC=${results.eurc.transfers.length}, USYC=${results.usyc.transfers.length} transfers`);
+
       // Process USDC transfers
       if (results.usdc.transfers.length > 0) {
         const count = await this.transferService.processNativeTransfers(results.usdc.transfers, 'USDC');
-        logSuccess(prefix, `Processed ${count} USDC transfers`);
+        logSuccess(prefix, `Saved ${count} USDC transfers to database`);
         totalProcessed += count;
       }
 
       // Process EURC transfers
       if (results.eurc.transfers.length > 0) {
         const count = await this.transferService.processNativeTransfers(results.eurc.transfers, 'EURC');
-        logSuccess(prefix, `Processed ${count} EURC transfers`);
+        logSuccess(prefix, `Saved ${count} EURC transfers to database`);
         totalProcessed += count;
       }
 
       // Process USYC transfers (regular transfers, not mints/redeems)
       if (results.usyc.transfers.length > 0) {
         const count = await this.transferService.processNativeTransfers(results.usyc.transfers, 'USYC');
-        logSuccess(prefix, `Processed ${count} USYC transfers`);
+        logSuccess(prefix, `Saved ${count} USYC transfers to database`);
         totalProcessed += count;
       }
 
       if (totalProcessed === 0) {
-        logDebug(prefix, `No native transfers found in block range`);
+        logInfo(prefix, `No native transfers to save in this block range`);
+      } else {
+        // Update hourly stats when we have new transfers
+        await this.transferService.updateHourlyStats(new Date());
+        logSuccess(prefix, `Updated hourly stats - total ${totalProcessed} transfers processed`);
       }
 
       await this.transferService.updateLastIndexedBlock(chainId, range.toBlock, indexerType);

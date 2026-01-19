@@ -1,30 +1,48 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { Dashboard } from './pages/Dashboard';
-import { Analytics } from './pages/Analytics';
-import { Crosschain } from './pages/Crosschain';
 import { FX } from './pages/FX';
-import { Chains } from './pages/Chains';
 import { ChainDetail } from './pages/ChainDetail';
 import { Wallet } from './pages/Wallet';
-import { Transfers } from './pages/Transfers';
 import { TransferDetail } from './pages/TransferDetail';
+import {
+  BridgeLayout,
+  BridgeOverview,
+  BridgeTransfers,
+  BridgeChains,
+  BridgeRoutes,
+} from './pages/bridge';
 
 export default function App() {
   return (
     <Layout>
       <Routes>
+        {/* Dashboard */}
         <Route path="/" element={<Dashboard />} />
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/crosschain" element={<Crosschain />} />
+        
+        {/* Bridge section with sub-navigation */}
+        <Route path="/bridge" element={<BridgeLayout><BridgeOverview /></BridgeLayout>} />
+        <Route path="/bridge/transfers" element={<BridgeLayout><BridgeTransfers /></BridgeLayout>} />
+        <Route path="/bridge/chains" element={<BridgeLayout><BridgeChains /></BridgeLayout>} />
+        <Route path="/bridge/chains/:chainId" element={<BridgeLayout><ChainDetail /></BridgeLayout>} />
+        <Route path="/bridge/routes" element={<BridgeLayout><BridgeRoutes /></BridgeLayout>} />
+        
+        {/* FX */}
         <Route path="/fx" element={<FX />} />
-        <Route path="/chains" element={<Chains />} />
-        <Route path="/chains/:chainId" element={<ChainDetail />} />
+        
+        {/* Wallet detail */}
         <Route path="/wallet/:address" element={<Wallet />} />
-        <Route path="/transfers" element={<Transfers />} />
+        
+        {/* Transfer detail */}
         <Route path="/transfers/:id" element={<TransferDetail />} />
-        {/* Legacy route redirect */}
-        <Route path="/routes" element={<Crosschain />} />
+        
+        {/* Legacy redirects */}
+        <Route path="/analytics" element={<Navigate to="/bridge" replace />} />
+        <Route path="/crosschain" element={<Navigate to="/bridge" replace />} />
+        <Route path="/routes" element={<Navigate to="/bridge/routes" replace />} />
+        <Route path="/transfers" element={<Navigate to="/bridge/transfers" replace />} />
+        <Route path="/chains" element={<Navigate to="/bridge/chains" replace />} />
+        <Route path="/chains/:chainId" element={<Navigate to="/bridge/chains/:chainId" replace />} />
       </Routes>
     </Layout>
   );

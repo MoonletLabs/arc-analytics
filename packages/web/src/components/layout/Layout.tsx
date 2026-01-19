@@ -3,11 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
-  BarChart3,
   GitBranch,
-  Layers,
   Wallet,
-  ArrowLeftRight,
   Moon,
   Sun,
   RefreshCw,
@@ -21,11 +18,8 @@ interface LayoutProps {
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { path: '/crosschain', label: 'Cross-chain', icon: GitBranch },
+  { path: '/bridge', label: 'Bridge', icon: GitBranch },
   { path: '/fx', label: 'FX', icon: RefreshCw },
-  { path: '/chains', label: 'Chains', icon: Layers },
-  { path: '/transfers', label: 'Transfers', icon: ArrowLeftRight },
 ];
 
 export function Layout({ children }: LayoutProps) {

@@ -2,9 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { statsApi, chainsApi } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { formatNumber } from '@/lib/utils';
-import { ArrowRight, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
-export function Crosschain() {
+export function BridgeRoutes() {
   const { data: routes, isLoading } = useQuery({
     queryKey: ['stats', 'routes'],
     queryFn: () => statsApi.getRoutes(undefined, 50),
@@ -35,15 +35,6 @@ export function Crosschain() {
   // Get max count for color scaling
   const maxCount = Math.max(...(heatmap?.data?.map((r) => r.count) || [1]));
 
-  // Calculate Arc-specific stats
-  const arcInbound = routes?.data?.filter(r => r.destChain === 'arc_testnet') || [];
-  const arcOutbound = routes?.data?.filter(r => r.sourceChain === 'arc_testnet') || [];
-  
-  const totalInbound = arcInbound.reduce((sum, r) => sum + r.transferCount, 0);
-  const totalOutbound = arcOutbound.reduce((sum, r) => sum + r.transferCount, 0);
-  const volumeInbound = arcInbound.reduce((sum, r) => sum + parseFloat(r.totalVolume), 0);
-  const volumeOutbound = arcOutbound.reduce((sum, r) => sum + parseFloat(r.totalVolume), 0);
-
   const getHeatmapColor = (count: number) => {
     const intensity = count / maxCount;
     if (intensity > 0.75) return 'bg-violet-600 text-white';
@@ -53,72 +44,13 @@ export function Crosschain() {
     return 'bg-muted';
   };
 
-  const formatChainName = (id: string) => {
-    const names: Record<string, string> = {
-      'arc_testnet': 'Arc',
-      'ethereum_sepolia': 'Ethereum',
-      'arbitrum_sepolia': 'Arbitrum',
-      'base_sepolia': 'Base',
-    };
-    return names[id] || id.split('_')[0];
-  };
-
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Cross-chain Transfers</h1>
+        <h1 className="text-3xl font-bold">Bridge Routes</h1>
         <p className="text-muted-foreground">
-          CCTP transfers between Arc and other chains
+          Cross-chain transfer routes and volume
         </p>
-      </div>
-
-      {/* Arc Flow Summary */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ArrowDownLeft className="h-4 w-4 text-green-500" />
-              Inbound to Arc
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalInbound.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              ${formatNumber(volumeInbound / 1e6)}M total volume
-            </p>
-            <div className="mt-3 space-y-1">
-              {arcInbound.slice(0, 3).map(route => (
-                <div key={route.sourceChain} className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">From {formatChainName(route.sourceChain)}</span>
-                  <span>{route.transferCount} transfers</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ArrowUpRight className="h-4 w-4 text-blue-500" />
-              Outbound from Arc
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalOutbound.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              ${formatNumber(volumeOutbound / 1e6)}M total volume
-            </p>
-            <div className="mt-3 space-y-1">
-              {arcOutbound.slice(0, 3).map(route => (
-                <div key={route.destChain} className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">To {formatChainName(route.destChain)}</span>
-                  <span>{route.transferCount} transfers</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Route Heatmap */}
@@ -132,9 +64,9 @@ export function Crosschain() {
               <table className="w-full">
                 <thead>
                   <tr>
-                    <th className="p-2 text-xs text-muted-foreground">From / To</th>
+                    <th className="p-2 text-xs text-muted-foreground text-left">From / To</th>
                     {chainList.map((chain) => (
-                      <th key={chain} className="p-2 text-xs text-muted-foreground">
+                      <th key={chain} className="p-2 text-xs text-muted-foreground text-center">
                         {formatChainName(chain)}
                       </th>
                     ))}
@@ -149,19 +81,24 @@ export function Crosschain() {
                         return (
                           <td key={dest} className="p-1">
                             {source === dest ? (
-                              <div className="w-12 h-12 bg-muted-foreground/10 rounded" />
+                              <div className="w-14 h-14 bg-muted-foreground/10 rounded" />
                             ) : (
                               <div
-                                className={`w-12 h-12 rounded flex items-center justify-center text-xs font-medium transition-colors ${
+                                className={`w-14 h-14 rounded flex flex-col items-center justify-center text-xs font-medium transition-colors ${
                                   data ? getHeatmapColor(data.count) : 'bg-muted'
                                 }`}
                                 title={
                                   data
-                                    ? `${formatChainName(source)} → ${formatChainName(dest)}: ${data.count} transfers`
+                                    ? `${formatChainName(source)} → ${formatChainName(dest)}: ${data.count} transfers, $${formatNumber(parseFloat(data.volume) / 1e6)}M`
                                     : 'No transfers'
                                 }
                               >
-                                {data?.count || '-'}
+                                <span>{data?.count || '-'}</span>
+                                {data && (
+                                  <span className="text-[10px] opacity-75">
+                                    ${formatNumber(parseFloat(data.volume) / 1e6)}M
+                                  </span>
+                                )}
                               </div>
                             )}
                           </td>
@@ -180,10 +117,10 @@ export function Crosschain() {
         </CardContent>
       </Card>
 
-      {/* Popular Routes List */}
+      {/* All Routes List */}
       <Card>
         <CardHeader>
-          <CardTitle>All Routes</CardTitle>
+          <CardTitle>All Routes by Volume</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -203,28 +140,46 @@ export function Crosschain() {
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
                       {i + 1}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className={`text-sm font-medium ${route.sourceChain === 'arc_testnet' ? 'text-violet-600' : ''}`}>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`px-3 py-1 rounded-md text-sm font-medium ${
+                          route.sourceChain === 'arc_testnet'
+                            ? 'bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300'
+                            : 'bg-muted'
+                        }`}
+                      >
                         {formatChainName(route.sourceChain)}
                       </div>
                       <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                      <div className={`text-sm font-medium ${route.destChain === 'arc_testnet' ? 'text-violet-600' : ''}`}>
+                      <div
+                        className={`px-3 py-1 rounded-md text-sm font-medium ${
+                          route.destChain === 'arc_testnet'
+                            ? 'bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300'
+                            : 'bg-muted'
+                        }`}
+                      >
                         {formatChainName(route.destChain)}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-6 text-right">
+                  <div className="flex items-center gap-8 text-right">
                     <div>
-                      <div className="text-sm font-medium">
+                      <div className="text-lg font-bold">
                         {route.transferCount.toLocaleString()}
                       </div>
                       <div className="text-xs text-muted-foreground">transfers</div>
                     </div>
                     <div>
-                      <div className="text-sm font-medium">
-                        ${formatNumber(parseFloat(route.totalVolume) / 1e6)}
+                      <div className="text-lg font-bold">
+                        ${formatNumber(parseFloat(route.totalVolume) / 1e6)}M
                       </div>
                       <div className="text-xs text-muted-foreground">volume</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold">
+                        ${formatNumber(parseFloat(route.avgAmount) / 1e6)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">avg size</div>
                     </div>
                   </div>
                 </div>
@@ -237,4 +192,14 @@ export function Crosschain() {
       </Card>
     </div>
   );
+}
+
+function formatChainName(id: string) {
+  const names: Record<string, string> = {
+    'arc_testnet': 'Arc',
+    'ethereum_sepolia': 'Ethereum',
+    'arbitrum_sepolia': 'Arbitrum',
+    'base_sepolia': 'Base',
+  };
+  return names[id] || id.split('_')[0];
 }

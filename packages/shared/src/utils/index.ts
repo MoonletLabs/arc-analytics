@@ -11,18 +11,25 @@ import type { TokenType } from '../types/index.js';
 export function formatAmount(amount: bigint | string, token: TokenType): string {
   const decimals = TOKEN_DECIMALS[token];
   const amountBigInt = typeof amount === 'string' ? BigInt(amount) : amount;
+  
+  // Handle negative numbers
+  const isNegative = amountBigInt < 0n;
+  const absAmount = isNegative ? -amountBigInt : amountBigInt;
+  
   const divisor = BigInt(10 ** decimals);
-  const wholePart = amountBigInt / divisor;
-  const fractionalPart = amountBigInt % divisor;
+  const wholePart = absAmount / divisor;
+  const fractionalPart = absAmount % divisor;
 
+  const sign = isNegative ? '-' : '';
+  
   if (fractionalPart === 0n) {
-    return wholePart.toString();
+    return `${sign}${wholePart.toString()}`;
   }
 
   const fractionalStr = fractionalPart.toString().padStart(decimals, '0');
   // Remove trailing zeros
   const trimmed = fractionalStr.replace(/0+$/, '');
-  return `${wholePart}.${trimmed}`;
+  return `${sign}${wholePart}.${trimmed}`;
 }
 
 /**

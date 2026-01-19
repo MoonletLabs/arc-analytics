@@ -8,7 +8,7 @@ import { formatNumber, formatAddress, formatDateTime, getExplorerUrl } from '@/l
 import { Link } from 'react-router-dom';
 import { ExternalLink, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 
-export function Transfers() {
+export function BridgeTransfers() {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({
     token: '',
@@ -52,9 +52,9 @@ export function Transfers() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Transfers</h1>
+        <h1 className="text-3xl font-bold">Bridge Transfers</h1>
         <p className="text-muted-foreground">
-          Browse all USDC/EURC cross-chain transfers
+          Browse all USDC/EURC cross-chain CCTP transfers
         </p>
       </div>
 
@@ -175,7 +175,7 @@ export function Transfers() {
                         </td>
                         <td className="py-3 px-2">
                           <div className="text-sm">
-                            {transfer.sourceChain.replace('_', ' ')}
+                            {formatChainName(transfer.sourceChain)}
                           </div>
                           <Link
                             to={`/wallet/${transfer.sourceAddress}`}
@@ -186,7 +186,7 @@ export function Transfers() {
                         </td>
                         <td className="py-3 px-2">
                           <div className="text-sm">
-                            {transfer.destChain.replace('_', ' ')}
+                            {formatChainName(transfer.destChain)}
                           </div>
                           <Link
                             to={`/wallet/${transfer.destAddress}`}
@@ -260,4 +260,14 @@ export function Transfers() {
       </Card>
     </div>
   );
+}
+
+function formatChainName(id: string) {
+  const names: Record<string, string> = {
+    'arc_testnet': 'Arc',
+    'ethereum_sepolia': 'Ethereum',
+    'arbitrum_sepolia': 'Arbitrum',
+    'base_sepolia': 'Base',
+  };
+  return names[id] || id.split('_')[0];
 }

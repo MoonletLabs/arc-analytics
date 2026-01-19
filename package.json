@@ -14,6 +14,7 @@
     "db:migrate": "turbo run db:migrate --filter=@usdc-eurc-analytics/db",
     "db:push": "turbo run db:push --filter=@usdc-eurc-analytics/db",
     "db:studio": "turbo run db:studio --filter=@usdc-eurc-analytics/db",
+    "db:seed": "tsx scripts/seed-dummy-data.ts",
     "indexer:start": "turbo run start --filter=@usdc-eurc-analytics/indexer",
     "indexer:dev": "turbo run dev --filter=@usdc-eurc-analytics/indexer",
     "api:start": "turbo run start --filter=@usdc-eurc-analytics/api",
@@ -23,11 +24,16 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
     "turbo": "^2.3.0",
     "typescript": "^5.7.0"
   },
   "packageManager": "pnpm@9.14.2",
   "engines": {
     "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.0",
+    "pg": "^8.17.1"
   }
 }

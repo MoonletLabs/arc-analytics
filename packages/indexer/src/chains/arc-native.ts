@@ -5,6 +5,7 @@ import {
   type Log,
   parseAbiItem,
   decodeEventLog,
+  formatUnits,
 } from 'viem';
 import {
   ERC20_ABI,
@@ -12,7 +13,25 @@ import {
   type ERC20TransferEvent,
   ARC_TESTNET_CONFIG,
   getTokenMessenger,
+  TOKEN_DECIMALS,
 } from '@usdc-eurc-analytics/shared';
+
+// Logging utilities
+const LOG_COLORS = {
+  reset: '\x1b[0m',
+  cyan: '\x1b[36m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  gray: '\x1b[90m',
+};
+
+function timestamp(): string {
+  return new Date().toISOString().replace('T', ' ').slice(0, 19);
+}
+
+function log(prefix: string, color: string, message: string, ...args: any[]): void {
+  console.log(`${LOG_COLORS.gray}[${timestamp()}]${LOG_COLORS.reset} ${color}[${prefix}]${LOG_COLORS.reset} ${message}`, ...args);
+}
 
 // ============================================
 // Types
@@ -111,6 +130,7 @@ export class ArcNativeIndexer {
     toBlock: number
   ): Promise<IndexedNativeTransfers> {
     const transfers: ERC20TransferEvent[] = [];
+    const prefix = `Native:${tokenType}`;
 
     const logs = await this.client.getLogs({
       address: tokenAddress,
@@ -119,15 +139,35 @@ export class ArcNativeIndexer {
       toBlock: BigInt(toBlock),
     });
 
-    for (const log of logs) {
-      const event = this.parseTransferEvent(log);
-      if (event && this.isNativeTransfer(event)) {
-        const timestamp = await this.getBlockTimestamp(log.blockNumber);
-        transfers.push({
-          ...event,
-          timestamp,
-        });
+    if (logs.length > 0) {
+      log(prefix, LOG_COLORS.cyan, `Found ${logs.length} raw Transfer events for ${tokenType} at ${tokenAddress}`);
+    }
+
+    let skippedCount = 0;
+    for (const logEntry of logs) {
+      const event = this.parseTransferEvent(logEntry);
+      if (event) {
+        if (this.isNativeTransfer(event)) {
+          const ts = await this.getBlockTimestamp(logEntry.blockNumber);
+          transfers.push({
+            ...event,
+            timestamp: ts,
+          });
+          
+          // Log each transfer found
+          const decimals = TOKEN_DECIMALS[tokenType] || 6;
+          const formattedAmount = formatUnits(event.value, decimals);
+          log(prefix, LOG_COLORS.green, 
+            `Transfer: ${formattedAmount} ${tokenType} | ${event.from.slice(0, 10)}... -> ${event.to.slice(0, 10)}... | Block ${logEntry.blockNumber} | Tx ${event.transactionHash.slice(0, 14)}...`
+          );
+        } else {
+          skippedCount++;
+        }
       }
+    }
+
+    if (skippedCount > 0) {
+      log(prefix, LOG_COLORS.yellow, `Skipped ${skippedCount} CCTP/gateway transfers`);
     }
 
     return {

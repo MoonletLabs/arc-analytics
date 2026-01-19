@@ -1,0 +1,32 @@
+# API Dockerfile
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Copy package files (root + packages)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/api/package.json ./packages/api/
+COPY packages/db/package.json ./packages/db/
+COPY packages/shared/package.json ./packages/shared/
+
+# Install all dependencies (including devDependencies for tsx)
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY packages/api ./packages/api
+COPY packages/db ./packages/db
+COPY packages/shared ./packages/shared
+COPY scripts ./scripts
+COPY tsconfig.json ./
+
+# Build packages
+RUN pnpm --filter @usdc-eurc-analytics/shared build
+RUN pnpm --filter @usdc-eurc-analytics/db build
+RUN pnpm --filter @usdc-eurc-analytics/api build
+
+EXPOSE 3001
+
+CMD ["node", "packages/api/dist/index.js"]
