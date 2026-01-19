@@ -118,42 +118,70 @@ export class EvmChainIndexer {
 
     const tokenMessenger = this.getTokenMessengerAddress();
     if (!tokenMessenger) {
-      console.warn(`No token messenger configured for chain ${this.chainId}`);
+      console.warn(`[${this.chainId}] No token messenger configured!`);
       return { burns, mints, lastBlock: toBlock };
+    }
+
+    const isDebug = process.env.DEBUG === 'true';
+    if (isDebug) {
+      console.log(`[${this.chainId}] Using TokenMessenger${this.isV2 ? 'V2' : ''}: ${tokenMessenger}`);
+      console.log(`[${this.chainId}] CCTP Version: ${this.cctpVersion}`);
     }
 
     // Fetch burn events (DepositForBurn)
     const burnEvent = this.isV2 ? DEPOSIT_FOR_BURN_EVENT_V2 : DEPOSIT_FOR_BURN_EVENT_V1;
     
-    const burnLogs = await this.client.getLogs({
-      address: tokenMessenger,
-      event: burnEvent,
-      fromBlock: BigInt(fromBlock),
-      toBlock: BigInt(toBlock),
-    });
+    try {
+      const burnLogs = await this.client.getLogs({
+        address: tokenMessenger,
+        event: burnEvent,
+        fromBlock: BigInt(fromBlock),
+        toBlock: BigInt(toBlock),
+      });
 
-    for (const log of burnLogs) {
-      const timestamp = await this.getBlockTimestamp(log.blockNumber);
-      const event = this.parseBurnEvent(log, timestamp);
-      if (event) {
-        burns.push(event);
+      if (isDebug && burnLogs.length > 0) {
+        console.log(`[${this.chainId}] Found ${burnLogs.length} burn logs`);
       }
+
+      for (const log of burnLogs) {
+        const timestamp = await this.getBlockTimestamp(log.blockNumber);
+        const event = this.parseBurnEvent(log, timestamp);
+        if (event) {
+          burns.push(event);
+          if (isDebug) {
+            console.log(`[${this.chainId}] Parsed burn: nonce=${event.nonce}, amount=${event.amount}, dest=${event.destinationDomain}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`[${this.chainId}] Error fetching burn logs:`, error);
     }
 
     // Fetch mint events (MintAndWithdraw)
-    const mintLogs = await this.client.getLogs({
-      address: tokenMessenger,
-      event: MINT_AND_WITHDRAW_EVENT,
-      fromBlock: BigInt(fromBlock),
-      toBlock: BigInt(toBlock),
-    });
+    try {
+      const mintLogs = await this.client.getLogs({
+        address: tokenMessenger,
+        event: MINT_AND_WITHDRAW_EVENT,
+        fromBlock: BigInt(fromBlock),
+        toBlock: BigInt(toBlock),
+      });
 
-    for (const log of mintLogs) {
-      const timestamp = await this.getBlockTimestamp(log.blockNumber);
-      const event = this.parseMintEvent(log, timestamp);
-      if (event) {
-        mints.push(event);
+      if (isDebug && mintLogs.length > 0) {
+        console.log(`[${this.chainId}] Found ${mintLogs.length} mint logs`);
       }
+
+      for (const log of mintLogs) {
+        const timestamp = await this.getBlockTimestamp(log.blockNumber);
+        const event = this.parseMintEvent(log, timestamp);
+        if (event) {
+          mints.push(event);
+          if (isDebug) {
+            console.log(`[${this.chainId}] Parsed mint: recipient=${event.mintRecipient}, amount=${event.amount}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`[${this.chainId}] Error fetching mint logs:`, error);
     }
 
     return {
