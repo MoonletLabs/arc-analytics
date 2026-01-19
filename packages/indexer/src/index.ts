@@ -1,12 +1,68 @@
 import 'dotenv/config';
 import { getDb } from '@usdc-eurc-analytics/db';
-import { sleep, isArcChain } from '@usdc-eurc-analytics/shared';
+import { sleep } from '@usdc-eurc-analytics/shared';
 import { config } from './config.js';
 import { createEvmIndexers, type EvmChainIndexer } from './chains/evm.js';
 import { ArcNativeIndexer, createArcNativeIndexer } from './chains/arc-native.js';
 import { USYCIndexer, createUSYCIndexer } from './chains/arc-usyc.js';
 import { StableFXIndexer, createStableFXIndexer } from './chains/arc-stablefx.js';
 import { TransferService } from './services/transfer-service.js';
+
+// ============================================
+// Logging Utilities
+// ============================================
+
+const LOG_COLORS = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  dim: '\x1b[2m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m',
+  red: '\x1b[31m',
+  gray: '\x1b[90m',
+};
+
+function timestamp(): string {
+  return new Date().toISOString().replace('T', ' ').slice(0, 19);
+}
+
+function log(prefix: string, color: string, message: string, ...args: any[]): void {
+  console.log(`${LOG_COLORS.gray}[${timestamp()}]${LOG_COLORS.reset} ${color}[${prefix}]${LOG_COLORS.reset} ${message}`, ...args);
+}
+
+function logInfo(prefix: string, message: string, ...args: any[]): void {
+  log(prefix, LOG_COLORS.cyan, message, ...args);
+}
+
+function logSuccess(prefix: string, message: string, ...args: any[]): void {
+  log(prefix, LOG_COLORS.green, message, ...args);
+}
+
+function logWarn(prefix: string, message: string, ...args: any[]): void {
+  log(prefix, LOG_COLORS.yellow, message, ...args);
+}
+
+function logError(prefix: string, message: string, ...args: any[]): void {
+  log(prefix, LOG_COLORS.red, message, ...args);
+}
+
+function logDebug(prefix: string, message: string, ...args: any[]): void {
+  if (process.env.DEBUG === 'true') {
+    log(prefix, LOG_COLORS.gray, message, ...args);
+  }
+}
+
+function formatBlockRange(from: number, to: number): string {
+  const count = to - from + 1;
+  return `${from.toLocaleString()}-${to.toLocaleString()} (${count.toLocaleString()} blocks)`;
+}
+
+function formatNumber(num: number): string {
+  return num.toLocaleString();
+}
 
 // ============================================
 // Main Indexer
@@ -33,17 +89,17 @@ class Indexer {
     if (config.arcConfig) {
       if (config.enableArcNative) {
         this.arcNativeIndexer = createArcNativeIndexer(config.arcConfig, config.batchSize);
-        console.log('Arc Native Transfer indexer enabled');
+        logInfo('Init', 'Arc Native Transfer indexer enabled');
       }
 
       if (config.enableUSYC && config.arcConfig.usyc) {
         this.usycIndexer = createUSYCIndexer(config.arcConfig, config.batchSize);
-        console.log('USYC Activity indexer enabled');
+        logInfo('Init', 'USYC Activity indexer enabled');
       }
 
       if (config.enableStableFX && config.arcConfig.fxEscrow) {
         this.stableFXIndexer = createStableFXIndexer(config.arcConfig, config.batchSize);
-        console.log('StableFX indexer enabled');
+        logInfo('Init', 'StableFX indexer enabled');
       }
     }
   }
@@ -53,29 +109,39 @@ class Indexer {
    */
   async start(): Promise<void> {
     console.log('');
-    console.log('========================================');
-    console.log('   Arc Analytics Indexer Starting...   ');
-    console.log('========================================');
+    console.log(`${LOG_COLORS.bright}${LOG_COLORS.magenta}========================================${LOG_COLORS.reset}`);
+    console.log(`${LOG_COLORS.bright}${LOG_COLORS.magenta}   Arc Analytics Indexer Starting...   ${LOG_COLORS.reset}`);
+    console.log(`${LOG_COLORS.bright}${LOG_COLORS.magenta}========================================${LOG_COLORS.reset}`);
     console.log('');
-    console.log(`CCTP Chains: ${Array.from(this.evmIndexers.keys()).join(', ')}`);
-    console.log(`Poll interval: ${config.pollIntervalMs}ms`);
-    console.log(`Batch size: ${config.batchSize} blocks`);
-    console.log(`Sync days (first run): ${config.syncDays} days`);
+    console.log(`${LOG_COLORS.cyan}Configuration:${LOG_COLORS.reset}`);
+    console.log(`  CCTP Chains:    ${Array.from(this.evmIndexers.keys()).join(', ')}`);
+    console.log(`  Poll interval:  ${config.pollIntervalMs}ms`);
+    console.log(`  Batch size:     ${formatNumber(config.batchSize)} blocks`);
+    console.log(`  Sync days:      ${config.syncDays} days (first run)`);
     console.log('');
-    console.log('Indexers:');
-    console.log(`  - CCTP (V1/V2): ${this.evmIndexers.size} chains`);
-    console.log(`  - Arc Native: ${this.arcNativeIndexer ? 'enabled' : 'disabled'}`);
-    console.log(`  - USYC: ${this.usycIndexer ? 'enabled' : 'disabled'}`);
-    console.log(`  - StableFX: ${this.stableFXIndexer ? 'enabled' : 'disabled'}`);
+    console.log(`${LOG_COLORS.cyan}Enabled Indexers:${LOG_COLORS.reset}`);
+    console.log(`  CCTP (V1/V2):   ${this.evmIndexers.size} chains`);
+    console.log(`  Arc Native:     ${this.arcNativeIndexer ? `${LOG_COLORS.green}enabled${LOG_COLORS.reset}` : `${LOG_COLORS.gray}disabled${LOG_COLORS.reset}`}`);
+    console.log(`  USYC:           ${this.usycIndexer ? `${LOG_COLORS.green}enabled${LOG_COLORS.reset}` : `${LOG_COLORS.gray}disabled${LOG_COLORS.reset}`}`);
+    console.log(`  StableFX:       ${this.stableFXIndexer ? `${LOG_COLORS.green}enabled${LOG_COLORS.reset}` : `${LOG_COLORS.gray}disabled${LOG_COLORS.reset}`}`);
+    console.log('');
+    console.log(`${LOG_COLORS.gray}Starting indexing loop...${LOG_COLORS.reset}`);
     console.log('');
 
     this.isRunning = true;
+    let cycleCount = 0;
 
     while (this.isRunning) {
+      cycleCount++;
+      const cycleStart = Date.now();
+      
       try {
+        logDebug('Cycle', `Starting cycle #${cycleCount}`);
         await this.runIndexingCycle();
+        const cycleDuration = Date.now() - cycleStart;
+        logDebug('Cycle', `Cycle #${cycleCount} completed in ${cycleDuration}ms`);
       } catch (error) {
-        console.error('Error during indexing cycle:', error);
+        logError('Cycle', `Error during cycle #${cycleCount}:`, error);
       }
 
       await sleep(config.pollIntervalMs);
@@ -86,7 +152,7 @@ class Indexer {
    * Stop the indexer
    */
   stop(): void {
-    console.log('Stopping indexer...');
+    logWarn('System', 'Stopping indexer...');
     this.isRunning = false;
   }
 
@@ -122,6 +188,7 @@ class Indexer {
    * Index CCTP events for a chain
    */
   private async indexCCTP(chainId: string, indexer: EvmChainIndexer): Promise<void> {
+    const prefix = `CCTP:${chainId}`;
     const indexerType = 'cctp';
 
     try {
@@ -133,13 +200,19 @@ class Indexer {
         lastIndexedBlock = indexer.calculateStartBlockForDays(currentBlock, config.syncDays);
         const blocksToSync = currentBlock - lastIndexedBlock;
         const estimatedDays = blocksToSync / indexer.getBlocksPerDay();
-        console.log(`[CCTP:${chainId}] First run, syncing ~${estimatedDays.toFixed(1)} days`);
+        logWarn(prefix, `First run - syncing ~${estimatedDays.toFixed(1)} days (${formatNumber(blocksToSync)} blocks)`);
+        logInfo(prefix, `Starting from block ${formatNumber(lastIndexedBlock)}, current: ${formatNumber(currentBlock)}`);
       }
 
       const range = indexer.calculateBlockRange(lastIndexedBlock, currentBlock);
-      if (!range) return;
+      if (!range) {
+        logDebug(prefix, `Up to date at block ${formatNumber(currentBlock)}`);
+        return;
+      }
 
-      console.log(`[CCTP:${chainId}] Indexing blocks ${range.fromBlock}-${range.toBlock}`);
+      const behindBlocks = currentBlock - range.toBlock;
+      const behindInfo = behindBlocks > 0 ? ` (${formatNumber(behindBlocks)} behind)` : '';
+      logInfo(prefix, `Indexing ${formatBlockRange(range.fromBlock, range.toBlock)}${behindInfo}`);
 
       const events = await indexer.indexBlockRange(range.fromBlock, range.toBlock);
 
@@ -149,7 +222,7 @@ class Indexer {
           chainId,
           indexer
         );
-        console.log(`[CCTP:${chainId}] Processed ${processed} burns`);
+        logSuccess(prefix, `Processed ${processed} burn events (outgoing transfers)`);
       }
 
       if (events.mints.length > 0) {
@@ -158,14 +231,18 @@ class Indexer {
           chainId,
           indexer
         );
-        console.log(`[CCTP:${chainId}] Completed ${completed} mints`);
+        logSuccess(prefix, `Completed ${completed} mint events (incoming transfers)`);
+      }
+
+      if (events.burns.length === 0 && events.mints.length === 0) {
+        logDebug(prefix, `No events found in block range`);
       }
 
       await this.transferService.updateLastIndexedBlock(chainId, range.toBlock, indexerType);
       await this.transferService.updateStats(new Date());
 
     } catch (error) {
-      console.error(`[CCTP:${chainId}] Error:`, error);
+      logError(prefix, `Error:`, error);
     }
   }
 
@@ -175,6 +252,7 @@ class Indexer {
   private async indexArcNative(): Promise<void> {
     if (!this.arcNativeIndexer) return;
 
+    const prefix = 'Native:arc';
     const chainId = 'arc_testnet';
     const indexerType = 'native';
 
@@ -184,38 +262,54 @@ class Indexer {
 
       if (lastIndexedBlock === null) {
         lastIndexedBlock = this.arcNativeIndexer.calculateStartBlockForDays(currentBlock, config.syncDays);
-        console.log(`[Native:arc] First run, starting from block ${lastIndexedBlock}`);
+        const blocksToSync = currentBlock - lastIndexedBlock;
+        logWarn(prefix, `First run - syncing ${formatNumber(blocksToSync)} blocks`);
+        logInfo(prefix, `Starting from block ${formatNumber(lastIndexedBlock)}, current: ${formatNumber(currentBlock)}`);
       }
 
       const range = this.arcNativeIndexer.calculateBlockRange(lastIndexedBlock, currentBlock);
-      if (!range) return;
+      if (!range) {
+        logDebug(prefix, `Up to date at block ${formatNumber(currentBlock)}`);
+        return;
+      }
 
-      console.log(`[Native:arc] Indexing blocks ${range.fromBlock}-${range.toBlock}`);
+      const behindBlocks = currentBlock - range.toBlock;
+      const behindInfo = behindBlocks > 0 ? ` (${formatNumber(behindBlocks)} behind)` : '';
+      logInfo(prefix, `Indexing ${formatBlockRange(range.fromBlock, range.toBlock)}${behindInfo}`);
 
       const results = await this.arcNativeIndexer.indexBlockRange(range.fromBlock, range.toBlock);
+
+      let totalProcessed = 0;
 
       // Process USDC transfers
       if (results.usdc.transfers.length > 0) {
         const count = await this.transferService.processNativeTransfers(results.usdc.transfers, 'USDC');
-        console.log(`[Native:arc] Processed ${count} USDC transfers`);
+        logSuccess(prefix, `Processed ${count} USDC transfers`);
+        totalProcessed += count;
       }
 
       // Process EURC transfers
       if (results.eurc.transfers.length > 0) {
         const count = await this.transferService.processNativeTransfers(results.eurc.transfers, 'EURC');
-        console.log(`[Native:arc] Processed ${count} EURC transfers`);
+        logSuccess(prefix, `Processed ${count} EURC transfers`);
+        totalProcessed += count;
       }
 
       // Process USYC transfers (regular transfers, not mints/redeems)
       if (results.usyc.transfers.length > 0) {
         const count = await this.transferService.processNativeTransfers(results.usyc.transfers, 'USYC');
-        console.log(`[Native:arc] Processed ${count} USYC transfers`);
+        logSuccess(prefix, `Processed ${count} USYC transfers`);
+        totalProcessed += count;
+      }
+
+      if (totalProcessed === 0) {
+        logDebug(prefix, `No native transfers found in block range`);
       }
 
       await this.transferService.updateLastIndexedBlock(chainId, range.toBlock, indexerType);
 
     } catch (error) {
-      console.error('[Native:arc] Error:', error);
+      logError(prefix, `Error:`, error);
     }
   }
 
@@ -225,6 +319,7 @@ class Indexer {
   private async indexUSYC(): Promise<void> {
     if (!this.usycIndexer) return;
 
+    const prefix = 'USYC:arc';
     const chainId = 'arc_testnet';
     const indexerType = 'usyc';
 
@@ -234,35 +329,51 @@ class Indexer {
 
       if (lastIndexedBlock === null) {
         lastIndexedBlock = this.usycIndexer.calculateStartBlockForDays(currentBlock, config.syncDays);
-        console.log(`[USYC:arc] First run, starting from block ${lastIndexedBlock}`);
+        const blocksToSync = currentBlock - lastIndexedBlock;
+        logWarn(prefix, `First run - syncing ${formatNumber(blocksToSync)} blocks`);
+        logInfo(prefix, `Starting from block ${formatNumber(lastIndexedBlock)}, current: ${formatNumber(currentBlock)}`);
       }
 
       const range = this.usycIndexer.calculateBlockRange(lastIndexedBlock, currentBlock);
-      if (!range) return;
+      if (!range) {
+        logDebug(prefix, `Up to date at block ${formatNumber(currentBlock)}`);
+        return;
+      }
 
-      console.log(`[USYC:arc] Indexing blocks ${range.fromBlock}-${range.toBlock}`);
+      const behindBlocks = currentBlock - range.toBlock;
+      const behindInfo = behindBlocks > 0 ? ` (${formatNumber(behindBlocks)} behind)` : '';
+      logInfo(prefix, `Indexing ${formatBlockRange(range.fromBlock, range.toBlock)}${behindInfo}`);
 
       const activity = await this.usycIndexer.indexBlockRange(range.fromBlock, range.toBlock);
 
+      let totalProcessed = 0;
+
       if (activity.deposits.length > 0) {
         const count = await this.transferService.processUSYCDeposits(activity.deposits);
-        console.log(`[USYC:arc] Processed ${count} deposits (mints)`);
+        logSuccess(prefix, `Processed ${count} deposits (mints)`);
+        totalProcessed += count;
       }
 
       if (activity.withdrawals.length > 0) {
         const count = await this.transferService.processUSYCWithdrawals(activity.withdrawals);
-        console.log(`[USYC:arc] Processed ${count} withdrawals (redeems)`);
+        logSuccess(prefix, `Processed ${count} withdrawals (redeems)`);
+        totalProcessed += count;
       }
 
       if (activity.transfers.length > 0) {
         const count = await this.transferService.processUSYCTransfers(activity.transfers);
-        console.log(`[USYC:arc] Processed ${count} transfers`);
+        logSuccess(prefix, `Processed ${count} transfers`);
+        totalProcessed += count;
+      }
+
+      if (totalProcessed === 0) {
+        logDebug(prefix, `No USYC activity found in block range`);
       }
 
       await this.transferService.updateLastIndexedBlock(chainId, range.toBlock, indexerType);
 
     } catch (error) {
-      console.error('[USYC:arc] Error:', error);
+      logError(prefix, `Error:`, error);
     }
   }
 
@@ -272,6 +383,7 @@ class Indexer {
   private async indexStableFX(): Promise<void> {
     if (!this.stableFXIndexer) return;
 
+    const prefix = 'FX:arc';
     const chainId = 'arc_testnet';
     const indexerType = 'fx';
 
@@ -281,28 +393,37 @@ class Indexer {
 
       if (lastIndexedBlock === null) {
         lastIndexedBlock = this.stableFXIndexer.calculateStartBlockForDays(currentBlock, config.syncDays);
-        console.log(`[FX:arc] First run, starting from block ${lastIndexedBlock}`);
+        const blocksToSync = currentBlock - lastIndexedBlock;
+        logWarn(prefix, `First run - syncing ${formatNumber(blocksToSync)} blocks`);
+        logInfo(prefix, `Starting from block ${formatNumber(lastIndexedBlock)}, current: ${formatNumber(currentBlock)}`);
       }
 
       const range = this.stableFXIndexer.calculateBlockRange(lastIndexedBlock, currentBlock);
-      if (!range) return;
+      if (!range) {
+        logDebug(prefix, `Up to date at block ${formatNumber(currentBlock)}`);
+        return;
+      }
 
-      console.log(`[FX:arc] Indexing blocks ${range.fromBlock}-${range.toBlock}`);
+      const behindBlocks = currentBlock - range.toBlock;
+      const behindInfo = behindBlocks > 0 ? ` (${formatNumber(behindBlocks)} behind)` : '';
+      logInfo(prefix, `Indexing ${formatBlockRange(range.fromBlock, range.toBlock)}${behindInfo}`);
 
       const results = await this.stableFXIndexer.indexBlockRange(range.fromBlock, range.toBlock);
 
       if (results.swaps.length > 0) {
         const count = await this.transferService.processFXSwaps(results.swaps, this.stableFXIndexer);
-        console.log(`[FX:arc] Processed ${count} swaps`);
+        logSuccess(prefix, `Processed ${count} FX swaps (USDC <-> EURC)`);
         
         // Update FX daily stats
         await this.transferService.updateFXStats(new Date());
+      } else {
+        logDebug(prefix, `No FX swaps found in block range`);
       }
 
       await this.transferService.updateLastIndexedBlock(chainId, range.toBlock, indexerType);
 
     } catch (error) {
-      console.error('[FX:arc] Error:', error);
+      logError(prefix, `Error:`, error);
     }
   }
 }
