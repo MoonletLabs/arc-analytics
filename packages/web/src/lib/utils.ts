@@ -72,6 +72,7 @@ export function formatDuration(seconds: number): string {
 
 export function getExplorerUrl(chain: string, txHash: string): string {
   const explorers: Record<string, string> = {
+    arc_testnet: 'https://testnet.arcscan.app/tx/',
     ethereum_sepolia: 'https://sepolia.etherscan.io/tx/',
     arbitrum_sepolia: 'https://sepolia.arbiscan.io/tx/',
     base_sepolia: 'https://sepolia.basescan.org/tx/',
@@ -80,4 +81,14 @@ export function getExplorerUrl(chain: string, txHash: string): string {
     optimism_sepolia: 'https://sepolia-optimism.etherscan.io/tx/',
   };
   return `${explorers[chain] || '#'}${txHash}`;
+}
+
+export function getChainName(chainId: string): string {
+  const names: Record<string, string> = {
+    arc_testnet: 'Arc',
+    ethereum_sepolia: 'Ethereum Sepolia',
+    arbitrum_sepolia: 'Arbitrum Sepolia',
+    base_sepolia: 'Base Sepolia',
+  };
+  return names[chainId] || chainId.replace('_', ' ');
 }

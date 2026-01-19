@@ -1,4 +1,4 @@
-import type { ChainConfig } from '../types/index.js';
+import type { ChainConfig, CCTPVersion } from '../types/index.js';
 
 // ============================================
 // CCTP Domain IDs
@@ -13,6 +13,7 @@ export const CCTP_DOMAINS = {
   SOLANA: 5,
   BASE: 6,
   POLYGON_POS: 7,
+  ARC: 26,
 } as const;
 
 // Reverse mapping: domain -> chain name
@@ -25,13 +26,78 @@ export const DOMAIN_TO_CHAIN: Record<number, string> = {
   5: 'solana',
   6: 'base',
   7: 'polygon',
+  26: 'arc',
 };
+
+// ============================================
+// Arc Testnet Configuration
+// ============================================
+
+export const ARC_TESTNET_CONFIG = {
+  chainId: 5042002,
+  domain: 26,
+  rpcUrl: 'https://rpc.testnet.arc.network',
+  wsUrl: 'wss://rpc.testnet.arc.network',
+  explorerUrl: 'https://testnet.arcscan.app',
+  blockTime: 0.5, // Sub-second finality
+  
+  // Token addresses
+  usdc: '0x3600000000000000000000000000000000000000' as `0x${string}`,
+  eurc: '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a' as `0x${string}`,
+  usyc: '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C' as `0x${string}`,
+  
+  // CCTP V2 contracts
+  tokenMessengerV2: '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA' as `0x${string}`,
+  messageTransmitterV2: '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`,
+  tokenMinterV2: '0xb43db544E2c27092c107639Ad201b3dEfAbcF192' as `0x${string}`,
+  
+  // StableFX
+  fxEscrow: '0x1f91886C7028986aD885ffCee0e40b75C9cd5aC1' as `0x${string}`,
+  
+  // USYC contracts
+  usycTeller: '0x9fdF14c5B14173D74C08Af27AebFf39240dC105A' as `0x${string}`,
+  usycEntitlements: '0xcc205224862c7641930c87679e98999d23c26113' as `0x${string}`,
+  
+  // Gateway
+  gatewayWallet: '0x0077777d7EBA4688BDeF3E311b846F25870A19B9' as `0x${string}`,
+  gatewayMinter: '0x0022222ABE238Cc2C7Bb1f21003F0a260052475B' as `0x${string}`,
+  
+  // Common contracts
+  permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3' as `0x${string}`,
+  multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11' as `0x${string}`,
+} as const;
 
 // ============================================
 // Testnet Chain Configurations
 // ============================================
 
 export const TESTNET_CHAINS: Record<string, ChainConfig> = {
+  // Arc Testnet - Primary chain for this analytics platform
+  arc_testnet: {
+    id: 'arc_testnet',
+    name: 'Arc Testnet',
+    chainId: ARC_TESTNET_CONFIG.chainId,
+    domain: ARC_TESTNET_CONFIG.domain,
+    type: 'evm',
+    isTestnet: true,
+    explorerUrl: ARC_TESTNET_CONFIG.explorerUrl,
+    rpcUrl: ARC_TESTNET_CONFIG.rpcUrl,
+    blockTime: ARC_TESTNET_CONFIG.blockTime,
+    cctpVersion: 2 as CCTPVersion,
+    tokenMessengerV2: ARC_TESTNET_CONFIG.tokenMessengerV2,
+    messageTransmitterV2: ARC_TESTNET_CONFIG.messageTransmitterV2,
+    tokenMinterV2: ARC_TESTNET_CONFIG.tokenMinterV2,
+    usdc: ARC_TESTNET_CONFIG.usdc,
+    eurc: ARC_TESTNET_CONFIG.eurc,
+    usyc: ARC_TESTNET_CONFIG.usyc,
+    fxEscrow: ARC_TESTNET_CONFIG.fxEscrow,
+    usycTeller: ARC_TESTNET_CONFIG.usycTeller,
+    usycEntitlements: ARC_TESTNET_CONFIG.usycEntitlements,
+    gatewayWallet: ARC_TESTNET_CONFIG.gatewayWallet,
+    gatewayMinter: ARC_TESTNET_CONFIG.gatewayMinter,
+  },
+  
+  // Ethereum Sepolia - Major chain for CCTP
   ethereum_sepolia: {
     id: 'ethereum_sepolia',
     name: 'Ethereum Sepolia',
@@ -40,22 +106,14 @@ export const TESTNET_CHAINS: Record<string, ChainConfig> = {
     type: 'evm',
     isTestnet: true,
     explorerUrl: 'https://sepolia.etherscan.io',
+    blockTime: 12,
+    cctpVersion: 1 as CCTPVersion,
     tokenMessenger: '0x9f3B8679c73C2Fef8b59B4F3444d4e156fb70AA5',
     messageTransmitter: '0x7865fAfC2db2093669d92c0F33AeEF291086BEFD',
     usdc: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
   },
-  avalanche_fuji: {
-    id: 'avalanche_fuji',
-    name: 'Avalanche Fuji',
-    chainId: 43113,
-    domain: 1,
-    type: 'evm',
-    isTestnet: true,
-    explorerUrl: 'https://testnet.snowtrace.io',
-    tokenMessenger: '0xeb08f243e5d3fcff26a9e38ae5520a669f4019d0',
-    messageTransmitter: '0xa9fb1b3009dcb79e2fe346c16a604b8fa8ae0a79',
-    usdc: '0x5425890298aed601595a70AB815c96711a31Bc65',
-  },
+  
+  // Arbitrum Sepolia - Major chain for CCTP
   arbitrum_sepolia: {
     id: 'arbitrum_sepolia',
     name: 'Arbitrum Sepolia',
@@ -64,10 +122,14 @@ export const TESTNET_CHAINS: Record<string, ChainConfig> = {
     type: 'evm',
     isTestnet: true,
     explorerUrl: 'https://sepolia.arbiscan.io',
+    blockTime: 0.25,
+    cctpVersion: 1 as CCTPVersion,
     tokenMessenger: '0x9f3B8679c73C2Fef8b59B4F3444d4e156fb70AA5',
     messageTransmitter: '0xaCF1ceeF35caAc005e15888dDb8A3515C41B4872',
     usdc: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
   },
+  
+  // Base Sepolia - Major chain for CCTP
   base_sepolia: {
     id: 'base_sepolia',
     name: 'Base Sepolia',
@@ -76,126 +138,27 @@ export const TESTNET_CHAINS: Record<string, ChainConfig> = {
     type: 'evm',
     isTestnet: true,
     explorerUrl: 'https://sepolia.basescan.org',
+    blockTime: 2,
+    cctpVersion: 1 as CCTPVersion,
     tokenMessenger: '0x9f3B8679c73C2Fef8b59B4F3444d4e156fb70AA5',
     messageTransmitter: '0x7865fAfC2db2093669d92c0F33AeEF291086BEFD',
     usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
   },
-  polygon_amoy: {
-    id: 'polygon_amoy',
-    name: 'Polygon Amoy',
-    chainId: 80002,
-    domain: 7,
-    type: 'evm',
-    isTestnet: true,
-    explorerUrl: 'https://amoy.polygonscan.com',
-    tokenMessenger: '0x9f3B8679c73C2Fef8b59B4F3444d4e156fb70AA5',
-    messageTransmitter: '0x7865fAfC2db2093669d92c0F33AeEF291086BEFD',
-    usdc: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
-  },
-  optimism_sepolia: {
-    id: 'optimism_sepolia',
-    name: 'Optimism Sepolia',
-    chainId: 11155420,
-    domain: 2,
-    type: 'evm',
-    isTestnet: true,
-    explorerUrl: 'https://sepolia-optimism.etherscan.io',
-    tokenMessenger: '0x9f3B8679c73C2Fef8b59B4F3444d4e156fb70AA5',
-    messageTransmitter: '0x7865fAfC2db2093669d92c0F33AeEF291086BEFD',
-    usdc: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7',
-  },
 };
 
 // ============================================
-// Mainnet Chain Configurations (for future use)
-// ============================================
-
-export const MAINNET_CHAINS: Record<string, ChainConfig> = {
-  ethereum: {
-    id: 'ethereum',
-    name: 'Ethereum',
-    chainId: 1,
-    domain: 0,
-    type: 'evm',
-    isTestnet: false,
-    explorerUrl: 'https://etherscan.io',
-    tokenMessenger: '0xBd3fa81B58Ba92a82136038B25aDec7066af3155',
-    messageTransmitter: '0x0a992d191DEeC32aFe36203Ad87D7d289a738F81',
-    usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-    eurc: '0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c',
-  },
-  avalanche: {
-    id: 'avalanche',
-    name: 'Avalanche',
-    chainId: 43114,
-    domain: 1,
-    type: 'evm',
-    isTestnet: false,
-    explorerUrl: 'https://snowtrace.io',
-    tokenMessenger: '0x6B25532e1060CE10cc3B0A99e5683b91BFDe6982',
-    messageTransmitter: '0x8186359aF5F57FbB40c6b14A588d2A59C0C29880',
-    usdc: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
-    eurc: '0xC891EB4cbdEFf6e073e859e987815Ed1505c2ACD',
-  },
-  arbitrum: {
-    id: 'arbitrum',
-    name: 'Arbitrum',
-    chainId: 42161,
-    domain: 3,
-    type: 'evm',
-    isTestnet: false,
-    explorerUrl: 'https://arbiscan.io',
-    tokenMessenger: '0x19330d10D9Cc8751218eaf51E8885D058642E08A',
-    messageTransmitter: '0xC30362313FBBA5cf9163F0bb16a0e01f01A896ca',
-    usdc: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
-    eurc: '0x863708032B5c328faFA11E7B8F6FFdD5E3E7e77f',
-  },
-  base: {
-    id: 'base',
-    name: 'Base',
-    chainId: 8453,
-    domain: 6,
-    type: 'evm',
-    isTestnet: false,
-    explorerUrl: 'https://basescan.org',
-    tokenMessenger: '0x1682Ae6375C4E4A97e4B583BC394c861A46D8962',
-    messageTransmitter: '0xAD09780d193884d503182aD4588450C416D6F9D4',
-    usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-    eurc: '0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42',
-  },
-  polygon: {
-    id: 'polygon',
-    name: 'Polygon PoS',
-    chainId: 137,
-    domain: 7,
-    type: 'evm',
-    isTestnet: false,
-    explorerUrl: 'https://polygonscan.com',
-    tokenMessenger: '0x9daF8c91AEFAE50b9c0E69629D3F6Ca40cA3B3FE',
-    messageTransmitter: '0xF3be9355363857F3e001be68856A2f96b4C39Ba9',
-    usdc: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
-    eurc: '0x0000000000000000000000000000000000000000', // Not available yet
-  },
-  optimism: {
-    id: 'optimism',
-    name: 'Optimism',
-    chainId: 10,
-    domain: 2,
-    type: 'evm',
-    isTestnet: false,
-    explorerUrl: 'https://optimistic.etherscan.io',
-    tokenMessenger: '0x2B4069517957735bE00ceE0fadAE88a26365528f',
-    messageTransmitter: '0x4D41f22c5a0e5c74090899E5a8Fb597a8842b3e8',
-    usdc: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85',
-    eurc: '0x0000000000000000000000000000000000000000', // Not available yet
-  },
-};
-
-// ============================================
-// Active Chains (start with testnets)
+// Active Chains
 // ============================================
 
 export const ACTIVE_CHAINS = TESTNET_CHAINS;
+
+// Arc is the primary chain
+export const PRIMARY_CHAIN = TESTNET_CHAINS.arc_testnet;
+
+// Chains that support CCTP cross-chain transfers
+export const CCTP_CHAINS = Object.values(TESTNET_CHAINS).filter(
+  chain => chain.tokenMessenger || chain.tokenMessengerV2
+);
 
 // ============================================
 // Token Decimals
@@ -204,33 +167,53 @@ export const ACTIVE_CHAINS = TESTNET_CHAINS;
 export const TOKEN_DECIMALS = {
   USDC: 6,
   EURC: 6,
+  USYC: 6,
+  // Note: Arc native USDC gas uses 18 decimals, but ERC-20 interface uses 6
+  USDC_NATIVE_GAS: 18,
 } as const;
 
 // ============================================
 // Utility Functions
 // ============================================
 
-export function getChainByDomain(domain: number, isTestnet = true): ChainConfig | undefined {
-  const chains = isTestnet ? TESTNET_CHAINS : MAINNET_CHAINS;
-  return Object.values(chains).find((chain) => chain.domain === domain);
+export function getChainByDomain(domain: number): ChainConfig | undefined {
+  return Object.values(TESTNET_CHAINS).find((chain) => chain.domain === domain);
 }
 
-export function getChainById(chainId: string, isTestnet = true): ChainConfig | undefined {
-  const chains = isTestnet ? TESTNET_CHAINS : MAINNET_CHAINS;
-  return chains[chainId];
+export function getChainById(chainId: string): ChainConfig | undefined {
+  return TESTNET_CHAINS[chainId];
 }
 
-export function getChainByEvmChainId(evmChainId: number, isTestnet = true): ChainConfig | undefined {
-  const chains = isTestnet ? TESTNET_CHAINS : MAINNET_CHAINS;
-  return Object.values(chains).find((chain) => chain.chainId === evmChainId);
+export function getChainByEvmChainId(evmChainId: number): ChainConfig | undefined {
+  return Object.values(TESTNET_CHAINS).find((chain) => chain.chainId === evmChainId);
 }
 
-export function getAllChains(isTestnet = true): ChainConfig[] {
-  const chains = isTestnet ? TESTNET_CHAINS : MAINNET_CHAINS;
-  return Object.values(chains);
+export function getAllChains(): ChainConfig[] {
+  return Object.values(TESTNET_CHAINS);
 }
 
-export function isValidChain(chainId: string, isTestnet = true): boolean {
-  const chains = isTestnet ? TESTNET_CHAINS : MAINNET_CHAINS;
-  return chainId in chains;
+export function isValidChain(chainId: string): boolean {
+  return chainId in TESTNET_CHAINS;
+}
+
+export function isArcChain(chainId: string): boolean {
+  return chainId === 'arc_testnet';
+}
+
+export function getTokenMessenger(chain: ChainConfig): `0x${string}` | undefined {
+  if (chain.cctpVersion === 2) {
+    return chain.tokenMessengerV2;
+  }
+  return chain.tokenMessenger;
+}
+
+export function getMessageTransmitter(chain: ChainConfig): `0x${string}` | undefined {
+  if (chain.cctpVersion === 2) {
+    return chain.messageTransmitterV2;
+  }
+  return chain.messageTransmitter;
+}
+
+export function getCCTPVersion(chain: ChainConfig): CCTPVersion {
+  return chain.cctpVersion || 1;
 }

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { eq, sql } from 'drizzle-orm';
-import { type Database, chains, transfers } from '@usdc-eurc-analytics/db';
-import { TESTNET_CHAINS, MAINNET_CHAINS } from '@usdc-eurc-analytics/shared';
+import { type Database, transfers } from '@usdc-eurc-analytics/db';
+import { TESTNET_CHAINS, type ChainConfig } from '@usdc-eurc-analytics/shared';
 
 export function chainsRouter(db: Database) {
   const router = new Hono();
@@ -9,8 +9,8 @@ export function chainsRouter(db: Database) {
   // GET /api/chains - Get all supported chains
   router.get('/', async (c) => {
     try {
-      const isTestnet = c.req.query('testnet') !== 'false';
-      const chainConfigs = isTestnet ? TESTNET_CHAINS : MAINNET_CHAINS;
+      // Currently only supporting testnet
+      const chainConfigs = TESTNET_CHAINS;
 
       // Get transfer counts per chain
       const outboundCounts = await db
@@ -37,7 +37,7 @@ export function chainsRouter(db: Database) {
       );
 
       // Combine with chain configs
-      const chainsWithStats = Object.values(chainConfigs).map((chain) => ({
+      const chainsWithStats = Object.values(chainConfigs).map((chain: ChainConfig) => ({
         ...chain,
         stats: {
           outboundTransfers: outboundMap[chain.id] || 0,
@@ -58,8 +58,8 @@ export function chainsRouter(db: Database) {
   router.get('/:id', async (c) => {
     try {
       const chainId = c.req.param('id');
-      const isTestnet = c.req.query('testnet') !== 'false';
-      const chainConfigs = isTestnet ? TESTNET_CHAINS : MAINNET_CHAINS;
+      // Currently only supporting testnet
+      const chainConfigs = TESTNET_CHAINS;
 
       const chainConfig = chainConfigs[chainId];
       if (!chainConfig) {

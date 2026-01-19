@@ -8,11 +8,14 @@ import {
 } from 'viem';
 import {
   TOKEN_MESSENGER_ABI,
+  TOKEN_MESSENGER_V2_ABI,
   type ChainConfig,
   type DepositForBurnEvent,
+  type DepositForBurnV2Event,
   type MintAndWithdrawEvent,
   bytes32ToAddress,
-  TESTNET_CHAINS,
+  getCCTPVersion,
+  getTokenMessenger,
 } from '@usdc-eurc-analytics/shared';
 
 // ============================================
@@ -25,7 +28,7 @@ export interface EvmIndexerOptions {
 }
 
 export interface IndexedEvents {
-  burns: DepositForBurnEvent[];
+  burns: (DepositForBurnEvent | DepositForBurnV2Event)[];
   mints: MintAndWithdrawEvent[];
   lastBlock: number;
 }
@@ -34,8 +37,14 @@ export interface IndexedEvents {
 // Event Signatures
 // ============================================
 
-const DEPOSIT_FOR_BURN_EVENT = parseAbiItem(
+// CCTP V1 Events
+const DEPOSIT_FOR_BURN_EVENT_V1 = parseAbiItem(
   'event DepositForBurn(uint64 indexed nonce, address indexed burnToken, uint256 amount, address indexed depositor, bytes32 mintRecipient, uint32 destinationDomain, bytes32 destinationTokenMessenger, bytes32 destinationCaller)'
+);
+
+// CCTP V2 Events (Arc) - burnToken is NOT indexed, maxFee IS indexed
+const DEPOSIT_FOR_BURN_EVENT_V2 = parseAbiItem(
+  'event DepositForBurn(uint64 indexed nonce, address burnToken, uint256 amount, address indexed depositor, bytes32 mintRecipient, uint32 destinationDomain, bytes32 destinationTokenMessenger, bytes32 destinationCaller, uint256 indexed maxFee)'
 );
 
 const MINT_AND_WITHDRAW_EVENT = parseAbiItem(
@@ -50,10 +59,12 @@ export class EvmChainIndexer {
   private client: PublicClient;
   private chainConfig: ChainConfig & { rpcUrl: string };
   private batchSize: number;
+  private cctpVersion: 1 | 2;
 
   constructor(options: EvmIndexerOptions) {
     this.chainConfig = options.chainConfig;
     this.batchSize = options.batchSize;
+    this.cctpVersion = getCCTPVersion(options.chainConfig);
 
     this.client = createPublicClient({
       transport: http(options.chainConfig.rpcUrl, {
@@ -69,6 +80,10 @@ export class EvmChainIndexer {
 
   get chainName(): string {
     return this.chainConfig.name;
+  }
+
+  get isV2(): boolean {
+    return this.cctpVersion === 2;
   }
 
   /**
@@ -88,16 +103,31 @@ export class EvmChainIndexer {
   }
 
   /**
+   * Get the token messenger address for this chain
+   */
+  getTokenMessengerAddress(): `0x${string}` | undefined {
+    return getTokenMessenger(this.chainConfig);
+  }
+
+  /**
    * Index events from a block range
    */
   async indexBlockRange(fromBlock: number, toBlock: number): Promise<IndexedEvents> {
-    const burns: DepositForBurnEvent[] = [];
+    const burns: (DepositForBurnEvent | DepositForBurnV2Event)[] = [];
     const mints: MintAndWithdrawEvent[] = [];
 
+    const tokenMessenger = this.getTokenMessengerAddress();
+    if (!tokenMessenger) {
+      console.warn(`No token messenger configured for chain ${this.chainId}`);
+      return { burns, mints, lastBlock: toBlock };
+    }
+
     // Fetch burn events (DepositForBurn)
+    const burnEvent = this.isV2 ? DEPOSIT_FOR_BURN_EVENT_V2 : DEPOSIT_FOR_BURN_EVENT_V1;
+    
     const burnLogs = await this.client.getLogs({
-      address: this.chainConfig.tokenMessenger,
-      event: DEPOSIT_FOR_BURN_EVENT,
+      address: tokenMessenger,
+      event: burnEvent,
       fromBlock: BigInt(fromBlock),
       toBlock: BigInt(toBlock),
     });
@@ -112,7 +142,7 @@ export class EvmChainIndexer {
 
     // Fetch mint events (MintAndWithdraw)
     const mintLogs = await this.client.getLogs({
-      address: this.chainConfig.tokenMessenger,
+      address: tokenMessenger,
       event: MINT_AND_WITHDRAW_EVENT,
       fromBlock: BigInt(fromBlock),
       toBlock: BigInt(toBlock),
@@ -134,41 +164,74 @@ export class EvmChainIndexer {
   }
 
   /**
-   * Parse a DepositForBurn event log
+   * Parse a DepositForBurn event log (handles both V1 and V2)
    */
-  private parseBurnEvent(log: Log, timestamp: number): DepositForBurnEvent | null {
+  private parseBurnEvent(log: Log, timestamp: number): DepositForBurnEvent | DepositForBurnV2Event | null {
     try {
+      const abi = this.isV2 ? TOKEN_MESSENGER_V2_ABI : TOKEN_MESSENGER_ABI;
+      
       const decoded = decodeEventLog({
-        abi: TOKEN_MESSENGER_ABI,
+        abi,
         data: log.data,
         topics: log.topics,
         eventName: 'DepositForBurn',
       });
 
-      const args = decoded.args as {
-        nonce: bigint;
-        burnToken: `0x${string}`;
-        amount: bigint;
-        depositor: `0x${string}`;
-        mintRecipient: `0x${string}`;
-        destinationDomain: number;
-        destinationTokenMessenger: `0x${string}`;
-        destinationCaller: `0x${string}`;
-      };
+      if (this.isV2) {
+        // V2 event parsing
+        const args = decoded.args as {
+          nonce: bigint;
+          burnToken: `0x${string}`;
+          amount: bigint;
+          depositor: `0x${string}`;
+          mintRecipient: `0x${string}`;
+          destinationDomain: number;
+          destinationTokenMessenger: `0x${string}`;
+          destinationCaller: `0x${string}`;
+          maxFee: bigint;
+        };
 
-      return {
-        nonce: args.nonce,
-        burnToken: args.burnToken,
-        amount: args.amount,
-        depositor: args.depositor,
-        mintRecipient: bytes32ToAddress(args.mintRecipient),
-        destinationDomain: args.destinationDomain,
-        destinationTokenMessenger: args.destinationTokenMessenger,
-        destinationCaller: args.destinationCaller,
-        transactionHash: log.transactionHash!,
-        blockNumber: log.blockNumber!,
-        timestamp,
-      };
+        return {
+          nonce: args.nonce,
+          burnToken: args.burnToken,
+          amount: args.amount,
+          depositor: args.depositor,
+          mintRecipient: bytes32ToAddress(args.mintRecipient),
+          destinationDomain: args.destinationDomain,
+          destinationTokenMessenger: args.destinationTokenMessenger,
+          destinationCaller: args.destinationCaller,
+          maxFee: args.maxFee,
+          transactionHash: log.transactionHash!,
+          blockNumber: log.blockNumber!,
+          timestamp,
+        } as DepositForBurnV2Event;
+      } else {
+        // V1 event parsing
+        const args = decoded.args as {
+          nonce: bigint;
+          burnToken: `0x${string}`;
+          amount: bigint;
+          depositor: `0x${string}`;
+          mintRecipient: `0x${string}`;
+          destinationDomain: number;
+          destinationTokenMessenger: `0x${string}`;
+          destinationCaller: `0x${string}`;
+        };
+
+        return {
+          nonce: args.nonce,
+          burnToken: args.burnToken,
+          amount: args.amount,
+          depositor: args.depositor,
+          mintRecipient: bytes32ToAddress(args.mintRecipient),
+          destinationDomain: args.destinationDomain,
+          destinationTokenMessenger: args.destinationTokenMessenger,
+          destinationCaller: args.destinationCaller,
+          transactionHash: log.transactionHash!,
+          blockNumber: log.blockNumber!,
+          timestamp,
+        };
+      }
     } catch (error) {
       console.error(`Failed to parse burn event: ${error}`);
       return null;
@@ -180,8 +243,10 @@ export class EvmChainIndexer {
    */
   private parseMintEvent(log: Log, timestamp: number): MintAndWithdrawEvent | null {
     try {
+      const abi = this.isV2 ? TOKEN_MESSENGER_V2_ABI : TOKEN_MESSENGER_ABI;
+      
       const decoded = decodeEventLog({
-        abi: TOKEN_MESSENGER_ABI,
+        abi,
         data: log.data,
         topics: log.topics,
         eventName: 'MintAndWithdraw',
@@ -210,13 +275,16 @@ export class EvmChainIndexer {
   /**
    * Determine token type from address
    */
-  getTokenType(tokenAddress: `0x${string}`): 'USDC' | 'EURC' | null {
+  getTokenType(tokenAddress: `0x${string}`): 'USDC' | 'EURC' | 'USYC' | null {
     const lowerAddress = tokenAddress.toLowerCase();
     if (lowerAddress === this.chainConfig.usdc.toLowerCase()) {
       return 'USDC';
     }
     if (this.chainConfig.eurc && lowerAddress === this.chainConfig.eurc.toLowerCase()) {
       return 'EURC';
+    }
+    if (this.chainConfig.usyc && lowerAddress === this.chainConfig.usyc.toLowerCase()) {
+      return 'USYC';
     }
     return null;
   }
@@ -241,17 +309,20 @@ export class EvmChainIndexer {
 
   /**
    * Get estimated blocks per day for this chain
-   * These are approximate values based on average block times
    */
   getBlocksPerDay(): number {
-    // Average block times (in seconds) for different chains
+    // Use configured block time, or default lookup
+    if (this.chainConfig.blockTime) {
+      const secondsPerDay = 24 * 60 * 60;
+      return Math.floor(secondsPerDay / this.chainConfig.blockTime);
+    }
+
+    // Fallback block times (in seconds) for different chains
     const blockTimes: Record<number, number> = {
+      5042002: 0.5,    // Arc Testnet (~500ms)
       11155111: 12,    // Ethereum Sepolia (~12s)
-      43113: 2,        // Avalanche Fuji (~2s)
       421614: 0.25,    // Arbitrum Sepolia (~250ms)
       84532: 2,        // Base Sepolia (~2s)
-      80002: 2,        // Polygon Amoy (~2s)
-      11155420: 2,     // Optimism Sepolia (~2s)
     };
 
     const blockTime = blockTimes[this.chainConfig.chainId] || 12; // Default to 12s

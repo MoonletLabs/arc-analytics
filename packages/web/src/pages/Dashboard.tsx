@@ -8,15 +8,43 @@ import { Link } from 'react-router-dom';
 import {
   ArrowUpRight,
   ArrowDownRight,
-  Clock,
   Users,
   Activity,
   TrendingUp,
   ExternalLink,
+  RefreshCw,
+  Layers,
 } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+async function fetchArcStats() {
+  const res = await fetch(`${API_URL}/api/arc/stats`);
+  if (!res.ok) throw new Error('Failed to fetch Arc stats');
+  return res.json();
+}
+
+async function fetchFXRate() {
+  const res = await fetch(`${API_URL}/api/fx/rate`);
+  if (!res.ok) throw new Error('Failed to fetch FX rate');
+  return res.json();
+}
+
 export function Dashboard() {
-  const { data: overview, isLoading: overviewLoading } = useQuery({
+  const { data: arcStats, isLoading: arcLoading } = useQuery({
+    queryKey: ['arc', 'stats'],
+    queryFn: fetchArcStats,
+    refetchInterval: 30000,
+  });
+
+  const { data: fxRate } = useQuery({
+    queryKey: ['fx', 'rate'],
+    queryFn: fetchFXRate,
+    refetchInterval: 10000,
+  });
+
+  // Overview stats - can be used for expanded metrics later
+  useQuery({
     queryKey: ['stats', 'overview'],
     queryFn: () => statsApi.getOverview(),
   });
@@ -36,39 +64,40 @@ export function Dashboard() {
     queryFn: () => statsApi.getPerformance(),
   });
 
-  const stats = overview?.data;
   const perf = performance?.data;
+  const currentRate = fxRate?.current?.rate || '1.08';
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <h1 className="text-3xl font-bold">Arc Analytics Dashboard</h1>
         <p className="text-muted-foreground">
-          Overview of USDC/EURC cross-chain transfers via Circle CCTP
+          Real-time analytics for Arc Network - The Economic OS for the internet
         </p>
       </div>
 
-      {/* Stats Cards */}
+      {/* Arc Overview Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {overviewLoading ? (
+        {arcLoading ? (
           <>
             <CardSkeleton />
             <CardSkeleton />
             <CardSkeleton />
             <CardSkeleton />
           </>
-        ) : stats ? (
+        ) : arcStats ? (
           <>
-            <Card>
+            <Card className="border-violet-200 dark:border-violet-800">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Volume</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">Arc TVL</CardTitle>
+                <Layers className="h-4 w-4 text-violet-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${formatNumber(stats.totalVolumeFormatted)}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.totalTransfers.toLocaleString()} total transfers
-                </p>
+                <div className="text-2xl font-bold">${arcStats.tvl?.total || '0'}</div>
+                <div className="flex gap-2 text-xs text-muted-foreground mt-1">
+                  <span className="text-usdc">USDC: ${arcStats.tvl?.usdc}</span>
+                  <span className="text-eurc">EURC: ${arcStats.tvl?.eurc}</span>
+                </div>
               </CardContent>
             </Card>
 
@@ -78,40 +107,91 @@ export function Dashboard() {
                 <Activity className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${formatNumber(stats.last24h.volumeFormatted)}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.last24h.transfers.toLocaleString()} transfers today
+                <div className="text-2xl font-bold">${arcStats.volume24h?.total || '0'}</div>
+                <div className="flex gap-2 text-xs text-muted-foreground mt-1">
+                  <span>Cross-chain: ${arcStats.volume24h?.crosschain}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">USDC/EURC Rate</CardTitle>
+                <RefreshCw className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{parseFloat(currentRate).toFixed(4)}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  FX Volume: ${arcStats.volume24h?.fx || '0'}
                 </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Unique Wallets</CardTitle>
+                <CardTitle className="text-sm font-medium">Active Wallets</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.uniqueWallets.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  Avg ${formatNumber(stats.avgTransferSizeFormatted)} per transfer
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.successRate}%</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.pendingTransfers} pending
+                <div className="text-2xl font-bold">{arcStats.activeWallets24h || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {arcStats.transactions24h?.total || 0} transactions today
                 </p>
               </CardContent>
             </Card>
           </>
         ) : null}
+      </div>
+
+      {/* Quick Links */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Link to="/crosschain">
+          <Card className="hover:border-violet-400 transition-colors cursor-pointer">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-violet-100 dark:bg-violet-900">
+                  <ArrowUpRight className="h-6 w-6 text-violet-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Cross-chain</h3>
+                  <p className="text-sm text-muted-foreground">CCTP transfers to/from Arc</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to="/fx">
+          <Card className="hover:border-violet-400 transition-colors cursor-pointer">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-green-100 dark:bg-green-900">
+                  <RefreshCw className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">StableFX</h3>
+                  <p className="text-sm text-muted-foreground">USDC/EURC swaps</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to="/analytics">
+          <Card className="hover:border-violet-400 transition-colors cursor-pointer">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900">
+                  <TrendingUp className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Analytics</h3>
+                  <p className="text-sm text-muted-foreground">Volume charts & trends</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Performance & Chains */}
@@ -158,7 +238,7 @@ export function Dashboard() {
         {/* Active Chains */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Active Chains</CardTitle>
+            <CardTitle>Connected Chains</CardTitle>
             <Link to="/chains" className="text-sm text-primary hover:underline">
               View all
             </Link>
@@ -172,10 +252,17 @@ export function Dashboard() {
                     to={`/chains/${chain.id}`}
                     className="flex items-center justify-between p-2 rounded-lg hover:bg-muted transition-colors"
                   >
-                    <div>
-                      <div className="font-medium">{chain.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {chain.stats.totalTransfers} transfers
+                    <div className="flex items-center gap-3">
+                      {chain.id === 'arc_testnet' && (
+                        <div className="w-2 h-2 rounded-full bg-violet-500" />
+                      )}
+                      <div>
+                        <div className={`font-medium ${chain.id === 'arc_testnet' ? 'text-violet-600' : ''}`}>
+                          {chain.name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {chain.stats.totalTransfers} transfers
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
@@ -236,11 +323,13 @@ export function Dashboard() {
                         ${formatNumber(transfer.amountFormatted)}
                       </td>
                       <td className="py-3 px-2 text-sm">
-                        <span className="text-muted-foreground">
-                          {transfer.sourceChain.replace('_', ' ')}
+                        <span className={transfer.sourceChain === 'arc_testnet' ? 'text-violet-600 font-medium' : 'text-muted-foreground'}>
+                          {transfer.sourceChain === 'arc_testnet' ? 'Arc' : transfer.sourceChain.split('_')[0]}
                         </span>
                         <span className="mx-1">→</span>
-                        <span>{transfer.destChain.replace('_', ' ')}</span>
+                        <span className={transfer.destChain === 'arc_testnet' ? 'text-violet-600 font-medium' : ''}>
+                          {transfer.destChain === 'arc_testnet' ? 'Arc' : transfer.destChain.split('_')[0]}
+                        </span>
                       </td>
                       <td className="py-3 px-2">
                         <StatusBadge status={transfer.status} />

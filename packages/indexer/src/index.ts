@@ -1,8 +1,11 @@
 import 'dotenv/config';
 import { getDb } from '@usdc-eurc-analytics/db';
-import { sleep } from '@usdc-eurc-analytics/shared';
+import { sleep, isArcChain } from '@usdc-eurc-analytics/shared';
 import { config } from './config.js';
 import { createEvmIndexers, type EvmChainIndexer } from './chains/evm.js';
+import { ArcNativeIndexer, createArcNativeIndexer } from './chains/arc-native.js';
+import { USYCIndexer, createUSYCIndexer } from './chains/arc-usyc.js';
+import { StableFXIndexer, createStableFXIndexer } from './chains/arc-stablefx.js';
 import { TransferService } from './services/transfer-service.js';
 
 // ============================================
@@ -13,29 +16,64 @@ class Indexer {
   private db: ReturnType<typeof getDb>;
   private transferService: TransferService;
   private evmIndexers: Map<string, EvmChainIndexer>;
+  
+  // Arc-specific indexers
+  private arcNativeIndexer: ArcNativeIndexer | null = null;
+  private usycIndexer: USYCIndexer | null = null;
+  private stableFXIndexer: StableFXIndexer | null = null;
+  
   private isRunning = false;
 
   constructor() {
     this.db = getDb(config.databaseUrl);
     this.transferService = new TransferService(this.db);
     this.evmIndexers = createEvmIndexers(config.chains, config.batchSize);
+
+    // Initialize Arc-specific indexers
+    if (config.arcConfig) {
+      if (config.enableArcNative) {
+        this.arcNativeIndexer = createArcNativeIndexer(config.arcConfig, config.batchSize);
+        console.log('Arc Native Transfer indexer enabled');
+      }
+
+      if (config.enableUSYC && config.arcConfig.usyc) {
+        this.usycIndexer = createUSYCIndexer(config.arcConfig, config.batchSize);
+        console.log('USYC Activity indexer enabled');
+      }
+
+      if (config.enableStableFX && config.arcConfig.fxEscrow) {
+        this.stableFXIndexer = createStableFXIndexer(config.arcConfig, config.batchSize);
+        console.log('StableFX indexer enabled');
+      }
+    }
   }
 
   /**
    * Start the indexer
    */
   async start(): Promise<void> {
-    console.log('Starting USDC/EURC Analytics Indexer...');
-    console.log(`Configured chains: ${Array.from(this.evmIndexers.keys()).join(', ')}`);
+    console.log('');
+    console.log('========================================');
+    console.log('   Arc Analytics Indexer Starting...   ');
+    console.log('========================================');
+    console.log('');
+    console.log(`CCTP Chains: ${Array.from(this.evmIndexers.keys()).join(', ')}`);
     console.log(`Poll interval: ${config.pollIntervalMs}ms`);
     console.log(`Batch size: ${config.batchSize} blocks`);
     console.log(`Sync days (first run): ${config.syncDays} days`);
+    console.log('');
+    console.log('Indexers:');
+    console.log(`  - CCTP (V1/V2): ${this.evmIndexers.size} chains`);
+    console.log(`  - Arc Native: ${this.arcNativeIndexer ? 'enabled' : 'disabled'}`);
+    console.log(`  - USYC: ${this.usycIndexer ? 'enabled' : 'disabled'}`);
+    console.log(`  - StableFX: ${this.stableFXIndexer ? 'enabled' : 'disabled'}`);
+    console.log('');
 
     this.isRunning = true;
 
     while (this.isRunning) {
       try {
-        await this.indexAllChains();
+        await this.runIndexingCycle();
       } catch (error) {
         console.error('Error during indexing cycle:', error);
       }
@@ -53,73 +91,218 @@ class Indexer {
   }
 
   /**
-   * Index all configured chains
+   * Run a complete indexing cycle
    */
-  private async indexAllChains(): Promise<void> {
-    const indexPromises = Array.from(this.evmIndexers.entries()).map(
-      ([chainId, indexer]) => this.indexChain(chainId, indexer)
+  private async runIndexingCycle(): Promise<void> {
+    // Run CCTP indexing for all chains
+    const cctpPromises = Array.from(this.evmIndexers.entries()).map(
+      ([chainId, indexer]) => this.indexCCTP(chainId, indexer)
     );
 
-    await Promise.allSettled(indexPromises);
+    // Run Arc-specific indexers in parallel
+    const arcPromises: Promise<void>[] = [];
+
+    if (this.arcNativeIndexer) {
+      arcPromises.push(this.indexArcNative());
+    }
+
+    if (this.usycIndexer) {
+      arcPromises.push(this.indexUSYC());
+    }
+
+    if (this.stableFXIndexer) {
+      arcPromises.push(this.indexStableFX());
+    }
+
+    // Wait for all indexers
+    await Promise.allSettled([...cctpPromises, ...arcPromises]);
   }
 
   /**
-   * Index a single chain
+   * Index CCTP events for a chain
    */
-  private async indexChain(chainId: string, indexer: EvmChainIndexer): Promise<void> {
-    try {
-      // Get current block and last indexed block
-      const currentBlock = await indexer.getCurrentBlock();
-      let lastIndexedBlock = await this.transferService.getLastIndexedBlock(chainId);
+  private async indexCCTP(chainId: string, indexer: EvmChainIndexer): Promise<void> {
+    const indexerType = 'cctp';
 
-      // If first time indexing, calculate start block based on INDEXER_SYNC_DAYS
+    try {
+      const currentBlock = await indexer.getCurrentBlock();
+      let lastIndexedBlock = await this.transferService.getLastIndexedBlock(chainId, indexerType);
+
+      // First time indexing
       if (lastIndexedBlock === null) {
         lastIndexedBlock = indexer.calculateStartBlockForDays(currentBlock, config.syncDays);
         const blocksToSync = currentBlock - lastIndexedBlock;
         const estimatedDays = blocksToSync / indexer.getBlocksPerDay();
-        console.log(`[${chainId}] First run, syncing ~${estimatedDays.toFixed(1)} days (${blocksToSync.toLocaleString()} blocks)`);
-        console.log(`[${chainId}] Starting from block ${lastIndexedBlock} (current: ${currentBlock})`);
+        console.log(`[CCTP:${chainId}] First run, syncing ~${estimatedDays.toFixed(1)} days`);
       }
 
-      // Calculate block range
       const range = indexer.calculateBlockRange(lastIndexedBlock, currentBlock);
-      if (!range) {
-        return; // Already up to date
-      }
+      if (!range) return;
 
-      console.log(`[${chainId}] Indexing blocks ${range.fromBlock} to ${range.toBlock}`);
+      console.log(`[CCTP:${chainId}] Indexing blocks ${range.fromBlock}-${range.toBlock}`);
 
-      // Fetch and process events
       const events = await indexer.indexBlockRange(range.fromBlock, range.toBlock);
 
-      // Process burn events (outgoing transfers)
       if (events.burns.length > 0) {
         const processed = await this.transferService.processBurnEvents(
           events.burns,
           chainId,
           indexer
         );
-        console.log(`[${chainId}] Processed ${processed} burn events`);
+        console.log(`[CCTP:${chainId}] Processed ${processed} burns`);
       }
 
-      // Process mint events (incoming transfers)
       if (events.mints.length > 0) {
         const completed = await this.transferService.processMintEvents(
           events.mints,
           chainId,
           indexer
         );
-        console.log(`[${chainId}] Completed ${completed} mint events`);
+        console.log(`[CCTP:${chainId}] Completed ${completed} mints`);
       }
 
-      // Update last indexed block
-      await this.transferService.updateLastIndexedBlock(chainId, range.toBlock);
-
-      // Update stats for today
+      await this.transferService.updateLastIndexedBlock(chainId, range.toBlock, indexerType);
       await this.transferService.updateStats(new Date());
 
     } catch (error) {
-      console.error(`[${chainId}] Error indexing:`, error);
+      console.error(`[CCTP:${chainId}] Error:`, error);
+    }
+  }
+
+  /**
+   * Index native transfers on Arc
+   */
+  private async indexArcNative(): Promise<void> {
+    if (!this.arcNativeIndexer) return;
+
+    const chainId = 'arc_testnet';
+    const indexerType = 'native';
+
+    try {
+      const currentBlock = await this.arcNativeIndexer.getCurrentBlock();
+      let lastIndexedBlock = await this.transferService.getLastIndexedBlock(chainId, indexerType);
+
+      if (lastIndexedBlock === null) {
+        lastIndexedBlock = this.arcNativeIndexer.calculateStartBlockForDays(currentBlock, config.syncDays);
+        console.log(`[Native:arc] First run, starting from block ${lastIndexedBlock}`);
+      }
+
+      const range = this.arcNativeIndexer.calculateBlockRange(lastIndexedBlock, currentBlock);
+      if (!range) return;
+
+      console.log(`[Native:arc] Indexing blocks ${range.fromBlock}-${range.toBlock}`);
+
+      const results = await this.arcNativeIndexer.indexBlockRange(range.fromBlock, range.toBlock);
+
+      // Process USDC transfers
+      if (results.usdc.transfers.length > 0) {
+        const count = await this.transferService.processNativeTransfers(results.usdc.transfers, 'USDC');
+        console.log(`[Native:arc] Processed ${count} USDC transfers`);
+      }
+
+      // Process EURC transfers
+      if (results.eurc.transfers.length > 0) {
+        const count = await this.transferService.processNativeTransfers(results.eurc.transfers, 'EURC');
+        console.log(`[Native:arc] Processed ${count} EURC transfers`);
+      }
+
+      // Process USYC transfers (regular transfers, not mints/redeems)
+      if (results.usyc.transfers.length > 0) {
+        const count = await this.transferService.processNativeTransfers(results.usyc.transfers, 'USYC');
+        console.log(`[Native:arc] Processed ${count} USYC transfers`);
+      }
+
+      await this.transferService.updateLastIndexedBlock(chainId, range.toBlock, indexerType);
+
+    } catch (error) {
+      console.error('[Native:arc] Error:', error);
+    }
+  }
+
+  /**
+   * Index USYC activity (mints/redeems)
+   */
+  private async indexUSYC(): Promise<void> {
+    if (!this.usycIndexer) return;
+
+    const chainId = 'arc_testnet';
+    const indexerType = 'usyc';
+
+    try {
+      const currentBlock = await this.usycIndexer.getCurrentBlock();
+      let lastIndexedBlock = await this.transferService.getLastIndexedBlock(chainId, indexerType);
+
+      if (lastIndexedBlock === null) {
+        lastIndexedBlock = this.usycIndexer.calculateStartBlockForDays(currentBlock, config.syncDays);
+        console.log(`[USYC:arc] First run, starting from block ${lastIndexedBlock}`);
+      }
+
+      const range = this.usycIndexer.calculateBlockRange(lastIndexedBlock, currentBlock);
+      if (!range) return;
+
+      console.log(`[USYC:arc] Indexing blocks ${range.fromBlock}-${range.toBlock}`);
+
+      const activity = await this.usycIndexer.indexBlockRange(range.fromBlock, range.toBlock);
+
+      if (activity.deposits.length > 0) {
+        const count = await this.transferService.processUSYCDeposits(activity.deposits);
+        console.log(`[USYC:arc] Processed ${count} deposits (mints)`);
+      }
+
+      if (activity.withdrawals.length > 0) {
+        const count = await this.transferService.processUSYCWithdrawals(activity.withdrawals);
+        console.log(`[USYC:arc] Processed ${count} withdrawals (redeems)`);
+      }
+
+      if (activity.transfers.length > 0) {
+        const count = await this.transferService.processUSYCTransfers(activity.transfers);
+        console.log(`[USYC:arc] Processed ${count} transfers`);
+      }
+
+      await this.transferService.updateLastIndexedBlock(chainId, range.toBlock, indexerType);
+
+    } catch (error) {
+      console.error('[USYC:arc] Error:', error);
+    }
+  }
+
+  /**
+   * Index StableFX swaps
+   */
+  private async indexStableFX(): Promise<void> {
+    if (!this.stableFXIndexer) return;
+
+    const chainId = 'arc_testnet';
+    const indexerType = 'fx';
+
+    try {
+      const currentBlock = await this.stableFXIndexer.getCurrentBlock();
+      let lastIndexedBlock = await this.transferService.getLastIndexedBlock(chainId, indexerType);
+
+      if (lastIndexedBlock === null) {
+        lastIndexedBlock = this.stableFXIndexer.calculateStartBlockForDays(currentBlock, config.syncDays);
+        console.log(`[FX:arc] First run, starting from block ${lastIndexedBlock}`);
+      }
+
+      const range = this.stableFXIndexer.calculateBlockRange(lastIndexedBlock, currentBlock);
+      if (!range) return;
+
+      console.log(`[FX:arc] Indexing blocks ${range.fromBlock}-${range.toBlock}`);
+
+      const results = await this.stableFXIndexer.indexBlockRange(range.fromBlock, range.toBlock);
+
+      if (results.swaps.length > 0) {
+        const count = await this.transferService.processFXSwaps(results.swaps, this.stableFXIndexer);
+        console.log(`[FX:arc] Processed ${count} swaps`);
+        
+        // Update FX daily stats
+        await this.transferService.updateFXStats(new Date());
+      }
+
+      await this.transferService.updateLastIndexedBlock(chainId, range.toBlock, indexerType);
+
+    } catch (error) {
+      console.error('[FX:arc] Error:', error);
     }
   }
 }
@@ -132,13 +315,13 @@ const indexer = new Indexer();
 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
-  console.log('Received SIGINT');
+  console.log('\nReceived SIGINT');
   indexer.stop();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  console.log('Received SIGTERM');
+  console.log('\nReceived SIGTERM');
   indexer.stop();
   process.exit(0);
 });

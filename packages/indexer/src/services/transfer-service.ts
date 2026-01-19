@@ -3,66 +3,87 @@ import {
   type Database,
   transfers,
   indexerState,
-  dailyStats,
-  routeStats,
-  walletStats,
+  arcNativeTransfers,
+  usycActivity,
+  fxSwaps,
+  fxDailyStats,
   type NewTransfer,
+  type NewArcNativeTransfer,
+  type NewUSYCActivity,
+  type NewFXSwap,
 } from '@usdc-eurc-analytics/db';
 import {
   type DepositForBurnEvent,
+  type DepositForBurnV2Event,
   type MintAndWithdrawEvent,
+  type ERC20TransferEvent,
+  type FXSwapSettledEvent,
+  type USYCDepositEvent,
+  type USYCWithdrawEvent,
   type ChainConfig,
   formatAmount,
   getChainByDomain,
   DOMAIN_TO_CHAIN,
+  TOKEN_DECIMALS,
 } from '@usdc-eurc-analytics/shared';
 import type { EvmChainIndexer } from '../chains/evm.js';
+import type { StableFXIndexer } from '../chains/arc-stablefx.js';
 
 export class TransferService {
   constructor(private db: Database) {}
 
+  // ============================================
+  // Indexer State Management
+  // ============================================
+
   /**
-   * Get the last indexed block for a chain
+   * Get the last indexed block for a chain and indexer type
    */
-  async getLastIndexedBlock(chainId: string): Promise<number | null> {
+  async getLastIndexedBlock(chainId: string, indexerType: string = 'cctp'): Promise<number | null> {
     const result = await this.db
       .select({ lastBlock: indexerState.lastBlock })
       .from(indexerState)
-      .where(eq(indexerState.chainId, chainId))
+      .where(
+        and(
+          eq(indexerState.chainId, chainId),
+          eq(indexerState.indexerType, indexerType)
+        )
+      )
       .limit(1);
 
     return result[0]?.lastBlock ?? null;
   }
 
   /**
-   * Update the last indexed block for a chain
+   * Update the last indexed block for a chain and indexer type
    */
-  async updateLastIndexedBlock(chainId: string, blockNumber: number): Promise<void> {
-    await this.db
-      .insert(indexerState)
-      .values({
-        chainId,
-        lastBlock: blockNumber,
-        lastUpdated: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: indexerState.chainId,
-        set: {
-          lastBlock: blockNumber,
-          lastUpdated: new Date(),
-        },
-      });
+  async updateLastIndexedBlock(chainId: string, blockNumber: number, indexerType: string = 'cctp'): Promise<void> {
+    // Use raw SQL for upsert since we have a composite key situation
+    await this.db.execute(sql`
+      INSERT INTO indexer_state (chain_id, indexer_type, last_block, last_updated)
+      VALUES (${chainId}, ${indexerType}, ${blockNumber}, NOW())
+      ON CONFLICT (chain_id) 
+      DO UPDATE SET 
+        last_block = ${blockNumber},
+        indexer_type = ${indexerType},
+        last_updated = NOW()
+    `);
   }
+
+  // ============================================
+  // CCTP Transfer Processing
+  // ============================================
 
   /**
    * Process burn events and create pending transfers
    */
   async processBurnEvents(
-    events: DepositForBurnEvent[],
+    events: (DepositForBurnEvent | DepositForBurnV2Event)[],
     sourceChainId: string,
     indexer: EvmChainIndexer
   ): Promise<number> {
     let processed = 0;
+    const sourceChain = getChainByDomain(indexer.isV2 ? 26 : 0); // Get proper domain
 
     for (const event of events) {
       const token = indexer.getTokenType(event.burnToken);
@@ -72,8 +93,11 @@ export class TransferService {
       }
 
       // Get destination chain from domain
-      const destChain = getChainByDomain(event.destinationDomain, true);
+      const destChain = getChainByDomain(event.destinationDomain);
       const destChainId = destChain?.id ?? DOMAIN_TO_CHAIN[event.destinationDomain] ?? `domain_${event.destinationDomain}`;
+
+      // Get source domain from chain config
+      const sourceDomain = sourceChain?.domain ?? 0;
 
       const transfer: NewTransfer = {
         token,
@@ -81,26 +105,25 @@ export class TransferService {
         amountFormatted: formatAmount(event.amount, token),
         sourceChain: sourceChainId,
         sourceTxHash: event.transactionHash,
-        sourceAddress: event.depositor,
+        sourceAddress: event.depositor.toLowerCase(),
         burnTimestamp: new Date(event.timestamp * 1000),
         burnBlockNumber: Number(event.blockNumber),
         destChain: destChainId,
-        destAddress: event.mintRecipient,
+        destAddress: event.mintRecipient.toLowerCase(),
         nonce: event.nonce.toString(),
-        sourceDomain: destChain ? indexer.chainId === 'ethereum_sepolia' ? 0 : 
-          Object.values(getChainByDomain(0, true) || {}).length : event.destinationDomain, // Will fix this
+        sourceDomain,
         destDomain: event.destinationDomain,
         status: 'pending',
+        transferType: 'cctp',
+        // V2 specific field
+        maxFee: 'maxFee' in event ? event.maxFee.toString() : undefined,
       };
 
-      // Get source domain from chain config
-      const sourceChain = getChainByDomain(0, true); // Placeholder - need to get from indexer
-      
       try {
         await this.db
           .insert(transfers)
           .values(transfer)
-          .onConflictDoNothing(); // Skip if already exists (idempotent)
+          .onConflictDoNothing();
 
         processed++;
       } catch (error) {
@@ -128,8 +151,7 @@ export class TransferService {
         continue;
       }
 
-      // Find matching pending transfer by amount and recipient
-      // Note: In production, you'd match by message hash/nonce for accuracy
+      // Find matching pending transfer
       const pendingTransfers = await this.db
         .select()
         .from(transfers)
@@ -164,6 +186,213 @@ export class TransferService {
 
     return completed;
   }
+
+  // ============================================
+  // Arc Native Transfer Processing
+  // ============================================
+
+  /**
+   * Process native token transfers on Arc
+   */
+  async processNativeTransfers(
+    events: ERC20TransferEvent[],
+    token: 'USDC' | 'EURC' | 'USYC'
+  ): Promise<number> {
+    let processed = 0;
+
+    for (const event of events) {
+      const transfer: NewArcNativeTransfer = {
+        token,
+        amount: event.value.toString(),
+        amountFormatted: formatAmount(event.value, token),
+        fromAddress: event.from.toLowerCase(),
+        toAddress: event.to.toLowerCase(),
+        txHash: event.transactionHash,
+        blockNumber: Number(event.blockNumber),
+        timestamp: new Date(event.timestamp * 1000),
+      };
+
+      try {
+        await this.db
+          .insert(arcNativeTransfers)
+          .values(transfer)
+          .onConflictDoNothing();
+
+        processed++;
+      } catch (error) {
+        console.error(`Failed to insert native transfer: ${error}`);
+      }
+    }
+
+    return processed;
+  }
+
+  // ============================================
+  // USYC Activity Processing
+  // ============================================
+
+  /**
+   * Process USYC deposit (mint) events
+   */
+  async processUSYCDeposits(events: USYCDepositEvent[]): Promise<number> {
+    let processed = 0;
+
+    for (const event of events) {
+      const activity: NewUSYCActivity = {
+        action: 'mint',
+        amount: event.usycAmount.toString(),
+        amountFormatted: formatAmount(event.usycAmount, 'USYC'),
+        usdcAmount: event.usdcAmount.toString(),
+        usdcAmountFormatted: formatAmount(event.usdcAmount, 'USDC'),
+        walletAddress: event.depositor.toLowerCase(),
+        txHash: event.transactionHash,
+        blockNumber: Number(event.blockNumber),
+        timestamp: new Date(event.timestamp * 1000),
+      };
+
+      try {
+        await this.db
+          .insert(usycActivity)
+          .values(activity)
+          .onConflictDoNothing();
+
+        processed++;
+      } catch (error) {
+        console.error(`Failed to insert USYC deposit: ${error}`);
+      }
+    }
+
+    return processed;
+  }
+
+  /**
+   * Process USYC withdrawal (redeem) events
+   */
+  async processUSYCWithdrawals(events: USYCWithdrawEvent[]): Promise<number> {
+    let processed = 0;
+
+    for (const event of events) {
+      const activity: NewUSYCActivity = {
+        action: 'redeem',
+        amount: event.usycAmount.toString(),
+        amountFormatted: formatAmount(event.usycAmount, 'USYC'),
+        usdcAmount: event.usdcAmount.toString(),
+        usdcAmountFormatted: formatAmount(event.usdcAmount, 'USDC'),
+        walletAddress: event.withdrawer.toLowerCase(),
+        txHash: event.transactionHash,
+        blockNumber: Number(event.blockNumber),
+        timestamp: new Date(event.timestamp * 1000),
+      };
+
+      try {
+        await this.db
+          .insert(usycActivity)
+          .values(activity)
+          .onConflictDoNothing();
+
+        processed++;
+      } catch (error) {
+        console.error(`Failed to insert USYC withdrawal: ${error}`);
+      }
+    }
+
+    return processed;
+  }
+
+  /**
+   * Process USYC transfer events
+   */
+  async processUSYCTransfers(events: ERC20TransferEvent[]): Promise<number> {
+    let processed = 0;
+
+    for (const event of events) {
+      const activity: NewUSYCActivity = {
+        action: 'transfer',
+        amount: event.value.toString(),
+        amountFormatted: formatAmount(event.value, 'USYC'),
+        walletAddress: event.from.toLowerCase(),
+        toAddress: event.to.toLowerCase(),
+        txHash: event.transactionHash,
+        blockNumber: Number(event.blockNumber),
+        timestamp: new Date(event.timestamp * 1000),
+      };
+
+      try {
+        await this.db
+          .insert(usycActivity)
+          .values(activity)
+          .onConflictDoNothing();
+
+        processed++;
+      } catch (error) {
+        console.error(`Failed to insert USYC transfer: ${error}`);
+      }
+    }
+
+    return processed;
+  }
+
+  // ============================================
+  // StableFX Processing
+  // ============================================
+
+  /**
+   * Process FX swap events
+   */
+  async processFXSwaps(
+    events: FXSwapSettledEvent[],
+    indexer: StableFXIndexer
+  ): Promise<number> {
+    let processed = 0;
+
+    for (const event of events) {
+      const baseToken = indexer.getTokenType(event.baseToken);
+      const quoteToken = indexer.getTokenType(event.quoteToken);
+
+      if (!baseToken || !quoteToken) {
+        console.warn(`Unknown token in FX swap: ${event.baseToken} / ${event.quoteToken}`);
+        continue;
+      }
+
+      // Calculate effective rate
+      const baseAmountNum = Number(event.baseAmount) / Math.pow(10, TOKEN_DECIMALS[baseToken]);
+      const quoteAmountNum = Number(event.quoteAmount) / Math.pow(10, TOKEN_DECIMALS[quoteToken]);
+      const effectiveRate = quoteAmountNum / baseAmountNum;
+
+      const swap: NewFXSwap = {
+        tradeId: event.tradeId,
+        maker: event.maker.toLowerCase(),
+        taker: event.taker.toLowerCase(),
+        baseToken,
+        quoteToken,
+        baseAmount: event.baseAmount.toString(),
+        baseAmountFormatted: formatAmount(event.baseAmount, baseToken),
+        quoteAmount: event.quoteAmount.toString(),
+        quoteAmountFormatted: formatAmount(event.quoteAmount, quoteToken),
+        effectiveRate: effectiveRate.toFixed(8),
+        txHash: event.transactionHash,
+        blockNumber: Number(event.blockNumber),
+        timestamp: new Date(event.timestamp * 1000),
+      };
+
+      try {
+        await this.db
+          .insert(fxSwaps)
+          .values(swap)
+          .onConflictDoNothing();
+
+        processed++;
+      } catch (error) {
+        console.error(`Failed to insert FX swap: ${error}`);
+      }
+    }
+
+    return processed;
+  }
+
+  // ============================================
+  // Statistics Updates
+  // ============================================
 
   /**
    * Update aggregated statistics
@@ -215,7 +444,37 @@ export class TransferService {
   }
 
   /**
-   * Update wallet statistics for a specific address
+   * Update FX daily statistics
+   */
+  async updateFXStats(date: Date): Promise<void> {
+    const dateStr = date.toISOString().split('T')[0];
+
+    await this.db.execute(sql`
+      INSERT INTO fx_daily_stats (date, swap_count, usdc_to_eurc_volume, eurc_to_usdc_volume, total_volume, unique_traders, avg_rate)
+      SELECT 
+        DATE(timestamp) as date,
+        COUNT(*) as swap_count,
+        SUM(CASE WHEN base_token = 'USDC' THEN base_amount::numeric ELSE 0 END) as usdc_to_eurc_volume,
+        SUM(CASE WHEN base_token = 'EURC' THEN base_amount::numeric ELSE 0 END) as eurc_to_usdc_volume,
+        SUM(base_amount::numeric) as total_volume,
+        COUNT(DISTINCT maker) + COUNT(DISTINCT taker) as unique_traders,
+        AVG(effective_rate::numeric) as avg_rate
+      FROM fx_swaps
+      WHERE DATE(timestamp) = ${dateStr}
+      GROUP BY DATE(timestamp)
+      ON CONFLICT (date)
+      DO UPDATE SET
+        swap_count = EXCLUDED.swap_count,
+        usdc_to_eurc_volume = EXCLUDED.usdc_to_eurc_volume,
+        eurc_to_usdc_volume = EXCLUDED.eurc_to_usdc_volume,
+        total_volume = EXCLUDED.total_volume,
+        unique_traders = EXCLUDED.unique_traders,
+        avg_rate = EXCLUDED.avg_rate
+    `);
+  }
+
+  /**
+   * Update wallet statistics
    */
   async updateWalletStats(address: string, token: string): Promise<void> {
     await this.db.execute(sql`

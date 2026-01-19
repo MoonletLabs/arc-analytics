@@ -10,6 +10,7 @@ import {
   ArrowLeftRight,
   Moon,
   Sun,
+  RefreshCw,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -20,7 +21,8 @@ interface LayoutProps {
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { path: '/routes', label: 'Routes', icon: GitBranch },
+  { path: '/crosschain', label: 'Cross-chain', icon: GitBranch },
+  { path: '/fx', label: 'FX', icon: RefreshCw },
   { path: '/chains', label: 'Chains', icon: Layers },
   { path: '/transfers', label: 'Transfers', icon: ArrowLeftRight },
 ];
@@ -50,16 +52,18 @@ export function Layout({ children }: LayoutProps) {
         <div className="container flex h-14 items-center">
           <Link to="/" className="flex items-center space-x-2 mr-8">
             <div className="flex items-center gap-1">
-              <div className="w-6 h-6 rounded-full bg-usdc" />
-              <div className="w-6 h-6 rounded-full bg-eurc -ml-2" />
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">A</span>
+              </div>
             </div>
-            <span className="font-bold text-lg">USDC/EURC Analytics</span>
+            <span className="font-bold text-lg">Arc Analytics</span>
           </Link>
 
           <nav className="flex items-center space-x-1 flex-1">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.path;
+              const isActive = location.pathname === item.path || 
+                (item.path !== '/' && location.pathname.startsWith(item.path));
               return (
                 <Link
                   key={item.path}
@@ -98,9 +102,27 @@ export function Layout({ children }: LayoutProps) {
       <footer className="border-t py-6 md:py-0">
         <div className="container flex flex-col items-center justify-between gap-4 md:h-14 md:flex-row">
           <p className="text-sm text-muted-foreground">
-            USDC/EURC Cross-Chain Analytics - Powered by Circle CCTP
+            Powered by{' '}
+            <a
+              href="https://moonlet.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-foreground hover:underline"
+            >
+              Moonlet
+            </a>
           </p>
-          <p className="text-sm text-muted-foreground">Testnet Data Only</p>
+          <p className="text-sm text-muted-foreground">
+            Arc Testnet Data |{' '}
+            <a
+              href="https://arc.network"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:underline"
+            >
+              arc.network
+            </a>
+          </p>
         </div>
       </footer>
     </div>

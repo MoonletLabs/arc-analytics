@@ -16,6 +16,9 @@ import { transfersRouter } from './routes/transfers.js';
 import { statsRouter } from './routes/stats.js';
 import { chainsRouter } from './routes/chains.js';
 import { walletsRouter } from './routes/wallets.js';
+import { createArcRoutes } from './routes/arc.js';
+import { createFXRoutes } from './routes/fx.js';
+import { createUSYCRoutes } from './routes/usyc.js';
 
 // Initialize database
 const db = getDb();
@@ -29,7 +32,7 @@ app.use('*', prettyJSON());
 app.use(
   '*',
   cors({
-    origin: ['http://localhost:5173', 'http://localhost:3000'],
+    origin: ['http://localhost:5173', 'http://localhost:3000', '*'],
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
   })
@@ -38,10 +41,19 @@ app.use(
 // Health check
 app.get('/', (c) => {
   return c.json({
-    name: 'USDC/EURC Analytics API',
-    version: '0.1.0',
+    name: 'Arc Analytics API',
+    version: '0.2.0',
     status: 'healthy',
     timestamp: new Date().toISOString(),
+    endpoints: {
+      transfers: '/api/transfers',
+      stats: '/api/stats',
+      chains: '/api/chains',
+      wallets: '/api/wallets',
+      arc: '/api/arc',
+      fx: '/api/fx',
+      usyc: '/api/usyc',
+    },
   });
 });
 
@@ -51,10 +63,17 @@ app.get('/health', (c) => {
 
 // API routes
 const api = new Hono();
+
+// Existing routes
 api.route('/transfers', transfersRouter(db));
 api.route('/stats', statsRouter(db));
 api.route('/chains', chainsRouter(db));
 api.route('/wallets', walletsRouter(db));
+
+// New Arc-specific routes
+api.route('/arc', createArcRoutes(db));
+api.route('/fx', createFXRoutes(db));
+api.route('/usyc', createUSYCRoutes(db));
 
 app.route('/api', api);
 
@@ -72,7 +91,11 @@ app.onError((err, c) => {
 // Start server
 const port = parseInt(process.env.API_PORT || '3001', 10);
 
-console.log(`Starting USDC/EURC Analytics API on port ${port}...`);
+console.log('');
+console.log('========================================');
+console.log('     Arc Analytics API Starting...     ');
+console.log('========================================');
+console.log('');
 
 serve({
   fetch: app.fetch,
@@ -80,3 +103,13 @@ serve({
 });
 
 console.log(`API server running at http://localhost:${port}`);
+console.log('');
+console.log('Available endpoints:');
+console.log(`  GET /api/transfers   - CCTP transfers`);
+console.log(`  GET /api/stats       - Global statistics`);
+console.log(`  GET /api/chains      - Chain information`);
+console.log(`  GET /api/wallets     - Wallet analytics`);
+console.log(`  GET /api/arc         - Arc network stats`);
+console.log(`  GET /api/fx          - StableFX swaps`);
+console.log(`  GET /api/usyc        - USYC activity`);
+console.log('');
