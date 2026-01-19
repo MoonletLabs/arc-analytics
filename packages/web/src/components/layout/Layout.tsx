@@ -1,0 +1,134 @@
+import { ReactNode } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { cn } from '@/lib/utils';
+import {
+  LayoutDashboard,
+  BarChart3,
+  GitBranch,
+  Layers,
+  Wallet,
+  ArrowLeftRight,
+  Moon,
+  Sun,
+} from 'lucide-react';
+import { useState, useEffect } from 'react';
+
+interface LayoutProps {
+  children: ReactNode;
+}
+
+const navItems = [
+  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { path: '/routes', label: 'Routes', icon: GitBranch },
+  { path: '/chains', label: 'Chains', icon: Layers },
+  { path: '/transfers', label: 'Transfers', icon: ArrowLeftRight },
+];
+
+export function Layout({ children }: LayoutProps) {
+  const location = useLocation();
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('theme');
+    if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      setIsDark(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    setIsDark(!isDark);
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme', isDark ? 'light' : 'dark');
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-14 items-center">
+          <Link to="/" className="flex items-center space-x-2 mr-8">
+            <div className="flex items-center gap-1">
+              <div className="w-6 h-6 rounded-full bg-usdc" />
+              <div className="w-6 h-6 rounded-full bg-eurc -ml-2" />
+            </div>
+            <span className="font-bold text-lg">USDC/EURC Analytics</span>
+          </Link>
+
+          <nav className="flex items-center space-x-1 flex-1">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="flex items-center gap-2">
+            <WalletSearch />
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-md hover:bg-muted"
+              aria-label="Toggle theme"
+            >
+              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <main className="container py-6">{children}</main>
+
+      {/* Footer */}
+      <footer className="border-t py-6 md:py-0">
+        <div className="container flex flex-col items-center justify-between gap-4 md:h-14 md:flex-row">
+          <p className="text-sm text-muted-foreground">
+            USDC/EURC Cross-Chain Analytics - Powered by Circle CCTP
+          </p>
+          <p className="text-sm text-muted-foreground">Testnet Data Only</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function WalletSearch() {
+  const [address, setAddress] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (address.trim()) {
+      window.location.href = `/wallet/${address.trim()}`;
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex items-center">
+      <div className="relative">
+        <Wallet className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <input
+          type="text"
+          placeholder="Search wallet..."
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          className="h-9 w-[200px] rounded-md border border-input bg-transparent pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+      </div>
+    </form>
+  );
+}

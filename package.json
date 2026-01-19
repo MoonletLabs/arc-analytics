@@ -1,0 +1,33 @@
+{
+  "name": "usdc-eurc-analytics",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "db:generate": "turbo run db:generate --filter=@usdc-eurc-analytics/db",
+    "db:migrate": "turbo run db:migrate --filter=@usdc-eurc-analytics/db",
+    "db:push": "turbo run db:push --filter=@usdc-eurc-analytics/db",
+    "db:studio": "turbo run db:studio --filter=@usdc-eurc-analytics/db",
+    "indexer:start": "turbo run start --filter=@usdc-eurc-analytics/indexer",
+    "indexer:dev": "turbo run dev --filter=@usdc-eurc-analytics/indexer",
+    "api:start": "turbo run start --filter=@usdc-eurc-analytics/api",
+    "api:dev": "turbo run dev --filter=@usdc-eurc-analytics/api",
+    "web:dev": "turbo run dev --filter=@usdc-eurc-analytics/web",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@9.14.2",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
