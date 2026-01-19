@@ -134,15 +134,15 @@ export function BridgeRoutes() {
               {routes.data.map((route, i) => (
                 <div
                   key={`${route.sourceChain}-${route.destChain}`}
-                  className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                  className="p-3 sm:p-4 rounded-lg border hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs sm:text-sm font-bold text-primary shrink-0">
                       {i + 1}
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                       <div
-                        className={`px-3 py-1 rounded-md text-sm font-medium ${
+                        className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium truncate ${
                           route.sourceChain === 'arc_testnet'
                             ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                             : 'bg-muted'
@@ -150,9 +150,9 @@ export function BridgeRoutes() {
                       >
                         {formatChainName(route.sourceChain)}
                       </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
                       <div
-                        className={`px-3 py-1 rounded-md text-sm font-medium ${
+                        className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium truncate ${
                           route.destChain === 'arc_testnet'
                             ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                             : 'bg-muted'
@@ -162,24 +162,24 @@ export function BridgeRoutes() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-8 text-right">
-                    <div>
-                      <div className="text-lg font-bold">
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t text-center">
+                    <div className="flex-1">
+                      <div className="text-sm sm:text-lg font-bold">
                         {route.transferCount.toLocaleString()}
                       </div>
-                      <div className="text-xs text-muted-foreground">transfers</div>
+                      <div className="text-[10px] sm:text-xs text-muted-foreground">transfers</div>
                     </div>
-                    <div>
-                      <div className="text-lg font-bold">
+                    <div className="flex-1">
+                      <div className="text-sm sm:text-lg font-bold">
                         ${formatNumber(parseFloat(route.totalVolume) / 1e6)}M
                       </div>
-                      <div className="text-xs text-muted-foreground">volume</div>
+                      <div className="text-[10px] sm:text-xs text-muted-foreground">volume</div>
                     </div>
-                    <div>
-                      <div className="text-lg font-bold">
+                    <div className="flex-1">
+                      <div className="text-sm sm:text-lg font-bold">
                         ${formatNumber(parseFloat(route.avgAmount) / 1e6)}
                       </div>
-                      <div className="text-xs text-muted-foreground">avg size</div>
+                      <div className="text-[10px] sm:text-xs text-muted-foreground">avg size</div>
                     </div>
                   </div>
                 </div>

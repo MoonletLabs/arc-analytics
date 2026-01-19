@@ -116,53 +116,28 @@ export function BridgeChains() {
                   <Link
                     key={chain.id}
                     to={`/bridge/chains/${chain.id}`}
-                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                    className="block p-3 sm:p-4 rounded-lg border hover:bg-muted/50 transition-colors"
                   >
-                    <div className="flex items-center gap-4">
-                      <div
-                        className={`w-3 h-3 rounded-full ${
-                          chain.id === 'arc_testnet' ? 'bg-blue-500' : 'bg-muted-foreground'
-                        }`}
-                      />
-                      <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div
-                          className={`font-medium text-lg ${
-                            chain.id === 'arc_testnet' ? 'text-blue-600' : ''
+                          className={`w-3 h-3 rounded-full shrink-0 ${
+                            chain.id === 'arc_testnet' ? 'bg-blue-500' : 'bg-muted-foreground'
                           }`}
-                        >
-                          {chain.name}
+                        />
+                        <div className="min-w-0">
+                          <div
+                            className={`font-medium text-base sm:text-lg truncate ${
+                              chain.id === 'arc_testnet' ? 'text-blue-600' : ''
+                            }`}
+                          >
+                            {chain.name}
+                          </div>
+                          <div className="text-xs sm:text-sm text-muted-foreground">
+                            <span className="sm:hidden">ID: {chain.chainId}</span>
+                            <span className="hidden sm:inline">Chain ID: {chain.chainId} | Domain: {chain.domain}</span>
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          Chain ID: {chain.chainId} | Domain: {chain.domain}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-8">
-                      <div className="text-right">
-                        <div className="flex items-center gap-1 text-green-600">
-                          <ArrowDownRight className="h-4 w-4" />
-                          <span className="font-medium">
-                            {chain.stats.inboundTransfers}
-                          </span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          ${formatNumber(parseFloat(chainVolume?.inboundVolume || '0') / 1e6)}M
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center gap-1 text-blue-600">
-                          <ArrowUpRight className="h-4 w-4" />
-                          <span className="font-medium">
-                            {chain.stats.outboundTransfers}
-                          </span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          ${formatNumber(parseFloat(chainVolume?.outboundVolume || '0') / 1e6)}M
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-medium">{chain.stats.totalTransfers}</div>
-                        <div className="text-xs text-muted-foreground">total</div>
                       </div>
                       {chain.explorerUrl && (
                         <a
@@ -170,11 +145,39 @@ export function BridgeChains() {
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="text-muted-foreground hover:text-primary"
+                          className="text-muted-foreground hover:text-primary shrink-0"
                         >
                           <ExternalLink className="h-4 w-4" />
                         </a>
                       )}
+                    </div>
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t text-center">
+                      <div className="flex-1">
+                        <div className="flex items-center justify-center gap-1 text-green-600">
+                          <ArrowDownRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <span className="text-sm sm:text-base font-medium">
+                            {chain.stats.inboundTransfers}
+                          </span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs text-muted-foreground">
+                          ${formatNumber(parseFloat(chainVolume?.inboundVolume || '0') / 1e6)}M in
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-center gap-1 text-blue-600">
+                          <ArrowUpRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <span className="text-sm sm:text-base font-medium">
+                            {chain.stats.outboundTransfers}
+                          </span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs text-muted-foreground">
+                          ${formatNumber(parseFloat(chainVolume?.outboundVolume || '0') / 1e6)}M out
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm sm:text-base font-medium">{chain.stats.totalTransfers}</div>
+                        <div className="text-[10px] sm:text-xs text-muted-foreground">total</div>
+                      </div>
                     </div>
                   </Link>
                 );
