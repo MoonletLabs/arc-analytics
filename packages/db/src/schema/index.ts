@@ -319,12 +319,19 @@ export const chains = pgTable('chains', {
 // Indexer State Table
 // ============================================
 
-export const indexerState = pgTable('indexer_state', {
-  chainId: varchar('chain_id', { length: 50 }).primaryKey(),
-  indexerType: varchar('indexer_type', { length: 30 }).notNull().default('cctp'), // cctp, native, usyc, fx
-  lastBlock: bigint('last_block', { mode: 'number' }).notNull(),
-  lastUpdated: timestamp('last_updated', { withTimezone: true }).notNull().defaultNow(),
-});
+export const indexerState = pgTable(
+  'indexer_state',
+  {
+    id: serial('id').primaryKey(),
+    chainId: varchar('chain_id', { length: 50 }).notNull(),
+    indexerType: varchar('indexer_type', { length: 30 }).notNull().default('cctp'), // cctp, native, usyc, fx
+    lastBlock: bigint('last_block', { mode: 'number' }).notNull(),
+    lastUpdated: timestamp('last_updated', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('indexer_state_chain_type_idx').on(table.chainId, table.indexerType),
+  ]
+);
 
 // ============================================
 // Type Exports

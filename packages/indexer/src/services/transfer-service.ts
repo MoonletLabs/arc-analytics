@@ -58,14 +58,13 @@ export class TransferService {
    * Update the last indexed block for a chain and indexer type
    */
   async updateLastIndexedBlock(chainId: string, blockNumber: number, indexerType: string = 'cctp'): Promise<void> {
-    // Use raw SQL for upsert since we have a composite key situation
+    // Use raw SQL for upsert with composite unique key (chain_id, indexer_type)
     await this.db.execute(sql`
       INSERT INTO indexer_state (chain_id, indexer_type, last_block, last_updated)
       VALUES (${chainId}, ${indexerType}, ${blockNumber}, NOW())
-      ON CONFLICT (chain_id) 
+      ON CONFLICT (chain_id, indexer_type) 
       DO UPDATE SET 
         last_block = ${blockNumber},
-        indexer_type = ${indexerType},
         last_updated = NOW()
     `);
   }
