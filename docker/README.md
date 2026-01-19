@@ -1,12 +1,32 @@
 # Docker Deployment
 
-Deploy the USDC/EURC Analytics dashboard on any VM with Docker.
+## Local Development
 
-## Quick Start
+Run database in Docker, app locally with hot reload:
+
+```bash
+# First time setup (creates DB, runs migrations, seeds data)
+pnpm dev:setup
+
+# Start DB
+pnpm dev:db
+
+# In another terminal, start app with hot reload
+pnpm dev
+
+# Stop DB when done
+pnpm dev:db:stop
+```
+
+Access:
+- **Web**: http://localhost:5173
+- **API**: http://localhost:3001
+
+## Production (VM Deployment)
+
+Deploy the full stack on a VM with Docker:
 
 ### 1. Initial Setup (First time only)
-
-This will create the database, run migrations, and seed with dummy data:
 
 ```bash
 cd docker
@@ -40,8 +60,17 @@ To expose the app through Cloudflare on a domain:
 
 Or use Cloudflare Zero Trust dashboard to create a tunnel pointing to `localhost:8080`.
 
-## Commands
+## Commands Summary
 
+### Local Development
+| Command | Description |
+|---------|-------------|
+| `pnpm dev:setup` | First time: create DB, migrate, seed data |
+| `pnpm dev:db` | Start PostgreSQL in Docker |
+| `pnpm dev` | Start API + Web with hot reload |
+| `pnpm dev:db:stop` | Stop PostgreSQL |
+
+### Production
 | Command | Description |
 |---------|-------------|
 | `./init-setup.sh` | Full reset: removes data, runs migrations, seeds dummy data |
@@ -49,90 +78,39 @@ Or use Cloudflare Zero Trust dashboard to create a tunnel pointing to `localhost
 | `docker compose down` | Stop all services |
 | `docker compose down -v` | Stop and remove all data |
 | `docker compose logs -f` | View logs |
-| `docker compose logs -f api` | View API logs only |
-| `docker compose logs -f nginx` | View nginx proxy logs |
-| `docker compose ps` | Check service status |
-
-## Services
-
-| Service | Internal Port | Description |
-|---------|---------------|-------------|
-| `nginx` | 80 (exposed: 8080) | Reverse proxy - single entry point |
-| `web` | 80 | Frontend (nginx serving React app) |
-| `api` | 3001 | Backend API (Node.js/Hono) |
-| `db` | 5432 | PostgreSQL database |
 
 ## Architecture
 
+### Local Development
 ```
-                    ┌─────────────┐
-                    │   Browser   │
-                    │ / Cloudflare│
-                    └──────┬──────┘
-                           │
-                    ┌──────▼──────┐
-                    │   nginx     │ :8080
-                    │  (proxy)    │
-                    └──────┬──────┘
-                           │
-              ┌────────────┴────────────┐
-              │                         │
-           /*                        /api/*
-              │                         │
-              ▼                         ▼
-    ┌─────────────────┐       ┌─────────────────┐
-    │     nginx       │       │   Hono API      │
-    │     (web)       │       │   (api)         │
-    └────────┬────────┘       └────────┬────────┘
-             │                         │
-             ▼                         │
-    ┌─────────────────┐                │
-    │  React SPA      │                │
-    │  (static)       │                │
-    └─────────────────┘                │
-                              ┌────────▼────────┐
-                              │   PostgreSQL    │
-                              │   (db)          │
-                              └─────────────────┘
+Browser → localhost:5173 (Vite) → localhost:3001 (API) → localhost:5432 (PostgreSQL/Docker)
+```
+
+### Production
+```
+Browser/Cloudflare → nginx:8080 → web + api → PostgreSQL
 ```
 
 ## Troubleshooting
 
-### Check all services are running
-```bash
-docker compose ps
-```
-
-### View logs
-```bash
-# All services
-docker compose logs -f
-
-# Specific service
-docker compose logs -f nginx
-docker compose logs -f api
-docker compose logs -f web
-```
-
-### Database connection issues
-```bash
-docker compose exec db psql -U postgres -d usdc_eurc_analytics -c "SELECT 1"
-```
-
 ### Rebuild images after code changes
 ```bash
+cd docker
 docker compose build --no-cache
 docker compose up -d
 ```
 
-### Reset everything
+### Reset everything (production)
 ```bash
+cd docker
 docker compose down -v
 ./init-setup.sh
 docker compose up -d
 ```
 
-### Test health endpoint
+### Reset dev database
 ```bash
-curl http://localhost:8080/health
+pnpm dev:db:stop
+docker volume rm docker_postgres_data_dev
+pnpm dev:setup
 ```

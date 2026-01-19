@@ -9,7 +9,6 @@ dotenvConfig({ path: resolve(process.cwd(), '.env') });
 
 export interface IndexerConfig {
   databaseUrl: string;
-  redisUrl: string;
   pollIntervalMs: number;
   batchSize: number;
   syncDays: number; // Number of days to sync on first run
@@ -77,7 +76,6 @@ export function loadConfig(): IndexerConfig {
 
   return {
     databaseUrl: getEnvOrThrow('DATABASE_URL'),
-    redisUrl: getEnvOrDefault('REDIS_URL', 'redis://localhost:6379'),
     pollIntervalMs: parseInt(getEnvOrDefault('INDEXER_POLL_INTERVAL_MS', '12000'), 10),
     batchSize: parseInt(getEnvOrDefault('INDEXER_BATCH_SIZE', '1000'), 10),
     syncDays: parseInt(getEnvOrDefault('INDEXER_SYNC_DAYS', '7'), 10),

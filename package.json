@@ -7,6 +7,9 @@
   ],
   "scripts": {
     "dev": "turbo run dev",
+    "dev:db": "docker compose -f docker/docker-compose.dev.yml up",
+    "dev:db:stop": "docker compose -f docker/docker-compose.dev.yml down",
+    "dev:setup": "docker compose -f docker/docker-compose.dev.yml up -d && sleep 3 && pnpm db:push && pnpm db:seed && docker compose -f docker/docker-compose.dev.yml down",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
