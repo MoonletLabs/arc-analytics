@@ -74,6 +74,7 @@ export function createFXRoutes(db: Database) {
   app.get('/stats', async (c) => {
     const days = parseInt(c.req.query('days') || '30');
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const sinceStr = since.toISOString();
 
     const result = await db.execute(sql`
       SELECT 
@@ -84,7 +85,7 @@ export function createFXRoutes(db: Database) {
         COUNT(DISTINCT maker) + COUNT(DISTINCT taker) as unique_traders,
         COALESCE(AVG(effective_rate::numeric), 0) as avg_rate
       FROM fx_swaps
-      WHERE timestamp >= ${since}
+      WHERE timestamp >= ${sinceStr}::timestamp
     `);
 
     const data = (result as any[])[0] as {
@@ -116,6 +117,7 @@ export function createFXRoutes(db: Database) {
   app.get('/volume', async (c) => {
     const days = parseInt(c.req.query('days') || '30');
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const sinceStr = since.toISOString();
 
     const result = await db.execute(sql`
       SELECT 
@@ -126,7 +128,7 @@ export function createFXRoutes(db: Database) {
         COALESCE(SUM(CASE WHEN base_token = 'EURC' THEN base_amount::numeric ELSE 0 END), 0) as eurc_to_usdc,
         COALESCE(AVG(effective_rate::numeric), 0) as avg_rate
       FROM fx_swaps
-      WHERE timestamp >= ${since}
+      WHERE timestamp >= ${sinceStr}::timestamp
       GROUP BY DATE(timestamp)
       ORDER BY date ASC
     `);

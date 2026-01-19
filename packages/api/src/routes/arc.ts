@@ -17,6 +17,7 @@ export function createArcRoutes(db: Database) {
   app.get('/stats', async (c) => {
     const now = new Date();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayStr = yesterday.toISOString();
 
     // Get 24h volume from CCTP (to/from Arc)
     const cctpVolume = await db.execute(sql`
@@ -24,7 +25,7 @@ export function createArcRoutes(db: Database) {
         COALESCE(SUM(CASE WHEN source_chain = 'arc_testnet' OR dest_chain = 'arc_testnet' THEN amount::numeric ELSE 0 END), 0) as total_volume,
         COUNT(*) as transfer_count
       FROM transfers
-      WHERE burn_timestamp >= ${yesterday}
+      WHERE burn_timestamp >= ${yesterdayStr}::timestamp
         AND (source_chain = 'arc_testnet' OR dest_chain = 'arc_testnet')
     `);
 
@@ -35,7 +36,7 @@ export function createArcRoutes(db: Database) {
         COALESCE(SUM(amount::numeric), 0) as volume,
         COUNT(*) as count
       FROM arc_native_transfers
-      WHERE timestamp >= ${yesterday}
+      WHERE timestamp >= ${yesterdayStr}::timestamp
       GROUP BY token
     `);
 
@@ -45,7 +46,7 @@ export function createArcRoutes(db: Database) {
         COALESCE(SUM(base_amount::numeric), 0) as volume,
         COUNT(*) as swap_count
       FROM fx_swaps
-      WHERE timestamp >= ${yesterday}
+      WHERE timestamp >= ${yesterdayStr}::timestamp
     `);
 
     // Get TVL (total supply on Arc from transfers in minus out)
@@ -64,16 +65,16 @@ export function createArcRoutes(db: Database) {
     const activeWallets = await db.execute(sql`
       SELECT COUNT(DISTINCT address) as count FROM (
         SELECT source_address as address FROM transfers 
-        WHERE burn_timestamp >= ${yesterday} AND source_chain = 'arc_testnet'
+        WHERE burn_timestamp >= ${yesterdayStr}::timestamp AND source_chain = 'arc_testnet'
         UNION
         SELECT dest_address as address FROM transfers 
-        WHERE mint_timestamp >= ${yesterday} AND dest_chain = 'arc_testnet'
+        WHERE mint_timestamp >= ${yesterdayStr}::timestamp AND dest_chain = 'arc_testnet'
         UNION
         SELECT from_address as address FROM arc_native_transfers 
-        WHERE timestamp >= ${yesterday}
+        WHERE timestamp >= ${yesterdayStr}::timestamp
         UNION
         SELECT to_address as address FROM arc_native_transfers 
-        WHERE timestamp >= ${yesterday}
+        WHERE timestamp >= ${yesterdayStr}::timestamp
       ) wallets
     `);
 
@@ -185,6 +186,7 @@ export function createArcRoutes(db: Database) {
   app.get('/tvl/history', async (c) => {
     const days = parseInt(c.req.query('days') || '30');
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const sinceStr = since.toISOString();
 
     const result = await db.execute(sql`
       SELECT 
@@ -193,7 +195,7 @@ export function createArcRoutes(db: Database) {
         SUM(CASE WHEN dest_chain = 'arc_testnet' AND status = 'completed' THEN amount::numeric ELSE 0 END) as inflow,
         SUM(CASE WHEN source_chain = 'arc_testnet' THEN amount::numeric ELSE 0 END) as outflow
       FROM transfers
-      WHERE burn_timestamp >= ${since}
+      WHERE burn_timestamp >= ${sinceStr}::timestamp
         AND (source_chain = 'arc_testnet' OR dest_chain = 'arc_testnet')
       GROUP BY DATE(burn_timestamp), token
       ORDER BY date ASC

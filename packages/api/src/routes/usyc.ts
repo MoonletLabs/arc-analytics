@@ -69,6 +69,7 @@ export function createUSYCRoutes(db: Database) {
   app.get('/stats', async (c) => {
     const days = parseInt(c.req.query('days') || '30');
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const sinceStr = since.toISOString();
 
     // Get activity counts
     const activityStats = await db.execute(sql`
@@ -78,7 +79,7 @@ export function createUSYCRoutes(db: Database) {
         COALESCE(SUM(amount::numeric), 0) as total_usyc,
         COALESCE(SUM(usdc_amount::numeric), 0) as total_usdc
       FROM usyc_activity
-      WHERE timestamp >= ${since}
+      WHERE timestamp >= ${sinceStr}::timestamp
       GROUP BY action
     `);
 
@@ -86,7 +87,7 @@ export function createUSYCRoutes(db: Database) {
     const walletStats = await db.execute(sql`
       SELECT COUNT(DISTINCT wallet_address) as unique_wallets
       FROM usyc_activity
-      WHERE timestamp >= ${since}
+      WHERE timestamp >= ${sinceStr}::timestamp
     `);
 
     // Parse results
@@ -149,6 +150,7 @@ export function createUSYCRoutes(db: Database) {
   app.get('/volume', async (c) => {
     const days = parseInt(c.req.query('days') || '30');
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const sinceStr = since.toISOString();
 
     const result = await db.execute(sql`
       SELECT 
@@ -158,7 +160,7 @@ export function createUSYCRoutes(db: Database) {
         COALESCE(SUM(amount::numeric), 0) as usyc_volume,
         COALESCE(SUM(usdc_amount::numeric), 0) as usdc_volume
       FROM usyc_activity
-      WHERE timestamp >= ${since}
+      WHERE timestamp >= ${sinceStr}::timestamp
       GROUP BY DATE(timestamp), action
       ORDER BY date ASC, action
     `);
