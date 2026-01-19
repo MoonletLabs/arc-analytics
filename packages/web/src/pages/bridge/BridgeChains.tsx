@@ -121,13 +121,13 @@ export function BridgeChains() {
                     <div className="flex items-center gap-4">
                       <div
                         className={`w-3 h-3 rounded-full ${
-                          chain.id === 'arc_testnet' ? 'bg-violet-500' : 'bg-muted-foreground'
+                          chain.id === 'arc_testnet' ? 'bg-blue-500' : 'bg-muted-foreground'
                         }`}
                       />
                       <div>
                         <div
                           className={`font-medium text-lg ${
-                            chain.id === 'arc_testnet' ? 'text-violet-600' : ''
+                            chain.id === 'arc_testnet' ? 'text-blue-600' : ''
                           }`}
                         >
                           {chain.name}

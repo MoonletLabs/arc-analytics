@@ -99,14 +99,14 @@ export function VolumeActivitySection({ token }: VolumeActivitySectionProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Volume & Activity</h2>
-        <p className="text-muted-foreground">
+        <h2 className="text-xl sm:text-2xl font-bold">Volume & Activity</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">
           Transfer volume, counts, and wallet activity on Arc
         </p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">7d Volume</CardTitle>
@@ -200,9 +200,10 @@ export function VolumeActivitySection({ token }: VolumeActivitySectionProps) {
         </CardHeader>
         <CardContent>
           {hourlyLoading ? (
-            <div className="h-[300px] bg-muted animate-pulse rounded" />
+            <div className="h-[250px] sm:h-[300px] bg-muted animate-pulse rounded" />
           ) : hourlyChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <div className="h-[250px] sm:h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={hourlyChartData}>
                 <defs>
                   <linearGradient id="hourlyVolumeGradient" x1="0" y1="0" x2="0" y2="1">
@@ -255,15 +256,16 @@ export function VolumeActivitySection({ token }: VolumeActivitySectionProps) {
                 />
               </AreaChart>
             </ResponsiveContainer>
+            </div>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+            <div className="h-[250px] sm:h-[300px] flex items-center justify-center text-muted-foreground text-sm text-center px-4">
               No hourly data available. Run the indexer to collect transfer data.
             </div>
           )}
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         {/* Daily Unique Wallets */}
         <Card>
           <CardHeader>
@@ -271,9 +273,10 @@ export function VolumeActivitySection({ token }: VolumeActivitySectionProps) {
           </CardHeader>
           <CardContent>
             {walletsLoading ? (
-              <div className="h-[250px] bg-muted animate-pulse rounded" />
+              <div className="h-[200px] sm:h-[250px] bg-muted animate-pulse rounded" />
             ) : walletsChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
+              <div className="h-[200px] sm:h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={walletsChartData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis
@@ -312,8 +315,9 @@ export function VolumeActivitySection({ token }: VolumeActivitySectionProps) {
                   <Bar dataKey="receivers" fill="#2775CA" name="Receivers" stackId="a" />
                 </BarChart>
               </ResponsiveContainer>
+              </div>
             ) : (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+              <div className="h-[200px] sm:h-[250px] flex items-center justify-center text-muted-foreground text-sm">
                 No wallet data available
               </div>
             )}
@@ -327,7 +331,7 @@ export function VolumeActivitySection({ token }: VolumeActivitySectionProps) {
           </CardHeader>
           <CardContent>
             {metricsLoading ? (
-              <div className="h-[250px] bg-muted animate-pulse rounded" />
+              <div className="h-[200px] sm:h-[250px] bg-muted animate-pulse rounded" />
             ) : metrics?.byToken && metrics.byToken.length > 0 ? (
               <div className="space-y-4">
                 {metrics.byToken.map((tokenMetrics: TokenMetrics) => (
@@ -372,7 +376,7 @@ export function VolumeActivitySection({ token }: VolumeActivitySectionProps) {
                 ))}
               </div>
             ) : (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+              <div className="h-[200px] sm:h-[250px] flex items-center justify-center text-muted-foreground text-sm">
                 No transfer metrics available
               </div>
             )}

@@ -230,7 +230,7 @@ export function VelocityRetentionSection({ token }: VelocityRetentionSectionProp
                           <p className="font-medium">
                             {new Date(data.date).toLocaleDateString()}
                           </p>
-                          <p className="text-sm text-purple-600">
+                          <p className="text-sm text-emerald-600">
                             New Wallets: {data.newWallets}
                           </p>
                           <p className="text-sm text-blue-600">

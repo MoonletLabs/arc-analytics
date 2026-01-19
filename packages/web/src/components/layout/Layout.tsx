@@ -8,6 +8,8 @@ import {
   Moon,
   Sun,
   RefreshCw,
+  Menu,
+  X,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -24,6 +26,7 @@ const navItems = [
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const [isDark, setIsDark] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('theme');
@@ -32,6 +35,11 @@ export function Layout({ children }: LayoutProps) {
       document.documentElement.classList.add('dark');
     }
   }, []);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -43,21 +51,33 @@ export function Layout({ children }: LayoutProps) {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
-          <Link to="/" className="flex items-center mr-8">
-            <img 
-              src="/logo-light.png" 
-              alt="Arc Analytics" 
-              className="h-8 dark:hidden"
-            />
-            <img 
-              src="/logo-dark.png" 
-              alt="Arc Analytics" 
-              className="h-8 hidden dark:block"
-            />
-          </Link>
+        <div className="container flex h-14 items-center justify-between">
+          <div className="flex items-center">
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 mr-2 rounded-md hover:bg-muted md:hidden"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
 
-          <nav className="flex items-center space-x-1 flex-1">
+            <Link to="/" className="flex items-center md:mr-8">
+              <img 
+                src="/logo-light.png" 
+                alt="Arc Analytics" 
+                className="h-7 sm:h-8 dark:hidden"
+              />
+              <img 
+                src="/logo-dark.png" 
+                alt="Arc Analytics" 
+                className="h-7 sm:h-8 hidden dark:block"
+              />
+            </Link>
+          </div>
+
+          {/* Desktop navigation */}
+          <nav className="hidden md:flex items-center space-x-1 flex-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path || 
@@ -81,7 +101,9 @@ export function Layout({ children }: LayoutProps) {
           </nav>
 
           <div className="flex items-center gap-2">
-            <WalletSearch />
+            <div className="hidden sm:block">
+              <WalletSearch />
+            </div>
             <button
               onClick={toggleTheme}
               className="p-2 rounded-md hover:bg-muted"
@@ -91,6 +113,38 @@ export function Layout({ children }: LayoutProps) {
             </button>
           </div>
         </div>
+
+        {/* Mobile navigation menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t bg-background">
+            <nav className="container py-3 space-y-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.path || 
+                  (item.path !== '/' && location.pathname.startsWith(item.path));
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md transition-colors',
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+              {/* Mobile wallet search */}
+              <div className="pt-2 px-3 sm:hidden">
+                <WalletSearch fullWidth />
+              </div>
+            </nav>
+          </div>
+        )}
       </header>
 
       {/* Main content */}
@@ -127,7 +181,7 @@ export function Layout({ children }: LayoutProps) {
   );
 }
 
-function WalletSearch() {
+function WalletSearch({ fullWidth = false }: { fullWidth?: boolean }) {
   const [address, setAddress] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -146,7 +200,10 @@ function WalletSearch() {
           placeholder="Search wallet..."
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          className="h-9 w-[200px] rounded-md border border-input bg-transparent pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          className={cn(
+            "h-9 rounded-md border border-input bg-transparent pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring",
+            fullWidth ? "w-full" : "w-[200px]"
+          )}
         />
       </div>
     </form>

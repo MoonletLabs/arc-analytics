@@ -84,14 +84,14 @@ export function FX() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">StableFX</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold">StableFX</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
           USDC/EURC foreign exchange on Arc
         </p>
       </div>
 
       {/* Key Metrics */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">USDC/EURC Rate</CardTitle>
@@ -142,14 +142,15 @@ export function FX() {
       </div>
 
       {/* Volume & Rate Charts */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Daily Volume</CardTitle>
           </CardHeader>
           <CardContent>
             {volume?.data?.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <div className="h-[250px] sm:h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={volume.data}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis 
@@ -162,11 +163,12 @@ export function FX() {
                     formatter={(value: any) => ['$' + (Number(value) / 1e6).toFixed(2) + 'M', 'Volume']}
                     labelFormatter={(label) => new Date(label).toLocaleDateString()}
                   />
-                  <Bar dataKey="totalVolume" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="totalVolume" fill="#2775CA" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+              </div>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+              <div className="h-[250px] sm:h-[300px] flex items-center justify-center text-muted-foreground text-sm">
                 No data available
               </div>
             )}
@@ -179,7 +181,8 @@ export function FX() {
           </CardHeader>
           <CardContent>
             {rate?.daily?.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <div className="h-[250px] sm:h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={rate.daily}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis 
@@ -199,14 +202,15 @@ export function FX() {
                   <Line 
                     type="monotone" 
                     dataKey="avg_rate" 
-                    stroke="#8b5cf6" 
+                    stroke="#2775CA" 
                     strokeWidth={2}
                     dot={false}
                   />
                 </LineChart>
               </ResponsiveContainer>
+              </div>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+              <div className="h-[250px] sm:h-[300px] flex items-center justify-center text-muted-foreground text-sm">
                 No data available
               </div>
             )}
@@ -215,7 +219,7 @@ export function FX() {
       </div>
 
       {/* Recent Swaps & Top Traders */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Recent Swaps</CardTitle>

@@ -102,14 +102,14 @@ export function BridgeOverview() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Bridge Overview</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold">Bridge Overview</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
           CCTP cross-chain transfer analytics and performance
         </p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         {overview?.data ? (
           <>
             <Card>
@@ -156,7 +156,7 @@ export function BridgeOverview() {
       </div>
 
       {/* Bridge Performance & Arc Flow Summary */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* Bridge Performance */}
         <Card>
           <CardHeader>
@@ -267,9 +267,10 @@ export function BridgeOverview() {
         </CardHeader>
         <CardContent>
           {dailyLoading ? (
-            <div className="h-[300px] bg-muted animate-pulse rounded" />
+            <div className="h-[250px] sm:h-[300px] bg-muted animate-pulse rounded" />
           ) : dailyChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <div className="h-[250px] sm:h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={dailyChartData}>
                 <defs>
                   <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
@@ -318,15 +319,16 @@ export function BridgeOverview() {
                 />
               </AreaChart>
             </ResponsiveContainer>
+            </div>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+            <div className="h-[250px] sm:h-[300px] flex items-center justify-center text-muted-foreground text-sm">
               No data available
             </div>
           )}
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         {/* Top Routes */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -395,10 +397,10 @@ export function BridgeOverview() {
                   >
                     <div className="flex items-center gap-3">
                       {chain.id === 'arc_testnet' && (
-                        <div className="w-2 h-2 rounded-full bg-violet-500" />
+                        <div className="w-2 h-2 rounded-full bg-blue-500" />
                       )}
                       <div>
-                        <div className={`font-medium ${chain.id === 'arc_testnet' ? 'text-violet-600' : ''}`}>
+                        <div className={`font-medium ${chain.id === 'arc_testnet' ? 'text-blue-600' : ''}`}>
                           {chain.name}
                         </div>
                         <div className="text-xs text-muted-foreground">
@@ -442,16 +444,16 @@ export function BridgeOverview() {
           {transfersLoading ? (
             <TableSkeleton rows={5} />
           ) : recentTransfers?.data ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <table className="w-full min-w-[600px]">
                 <thead>
-                  <tr className="border-b text-sm text-muted-foreground">
-                    <th className="text-left py-3 px-2">Token</th>
-                    <th className="text-left py-3 px-2">Amount</th>
-                    <th className="text-left py-3 px-2">Route</th>
-                    <th className="text-left py-3 px-2">Status</th>
-                    <th className="text-left py-3 px-2">Time</th>
-                    <th className="text-left py-3 px-2">Tx</th>
+                  <tr className="border-b text-xs sm:text-sm text-muted-foreground">
+                    <th className="text-left py-2 sm:py-3 px-2">Token</th>
+                    <th className="text-left py-2 sm:py-3 px-2">Amount</th>
+                    <th className="text-left py-2 sm:py-3 px-2">Route</th>
+                    <th className="text-left py-2 sm:py-3 px-2">Status</th>
+                    <th className="text-left py-2 sm:py-3 px-2">Time</th>
+                    <th className="text-left py-2 sm:py-3 px-2">Tx</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -464,11 +466,11 @@ export function BridgeOverview() {
                         ${formatNumber(transfer.amountFormatted)}
                       </td>
                       <td className="py-3 px-2 text-sm">
-                        <span className={transfer.sourceChain === 'arc_testnet' ? 'text-violet-600 font-medium' : 'text-muted-foreground'}>
+                        <span className={transfer.sourceChain === 'arc_testnet' ? 'text-blue-600 font-medium' : 'text-muted-foreground'}>
                           {formatChainName(transfer.sourceChain)}
                         </span>
                         <span className="mx-1">→</span>
-                        <span className={transfer.destChain === 'arc_testnet' ? 'text-violet-600 font-medium' : ''}>
+                        <span className={transfer.destChain === 'arc_testnet' ? 'text-blue-600 font-medium' : ''}>
                           {formatChainName(transfer.destChain)}
                         </span>
                       </td>

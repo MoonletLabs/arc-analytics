@@ -50,14 +50,14 @@ export function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Arc Analytics Dashboard</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold">Arc Analytics Dashboard</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
           Real-time stablecoin analytics for Arc Network
         </p>
       </div>
 
       {/* Stablecoin Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         {metricsLoading ? (
           <>
             <CardSkeleton />
@@ -67,10 +67,10 @@ export function Dashboard() {
           </>
         ) : metrics ? (
           <>
-            <Card className="border-violet-200 dark:border-violet-800">
+            <Card className="border-blue-200 dark:border-blue-800">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">7d Volume</CardTitle>
-                <TrendingUp className="h-4 w-4 text-violet-500" />
+                <TrendingUp className="h-4 w-4 text-blue-500" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">${formatNumber(totalVolume / 1e6)}M</div>
@@ -134,11 +134,11 @@ export function Dashboard() {
       {/* Quick Links */}
       <div className="grid gap-4 md:grid-cols-3">
         <Link to="/bridge">
-          <Card className="hover:border-violet-400 transition-colors cursor-pointer">
+          <Card className="hover:border-blue-400 transition-colors cursor-pointer">
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-violet-100 dark:bg-violet-900">
-                  <GitBranch className="h-6 w-6 text-violet-600" />
+                <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900">
+                  <GitBranch className="h-6 w-6 text-blue-600" />
                 </div>
                 <div>
                   <h3 className="font-semibold">Bridge</h3>
@@ -150,7 +150,7 @@ export function Dashboard() {
         </Link>
 
         <Link to="/fx">
-          <Card className="hover:border-violet-400 transition-colors cursor-pointer">
+          <Card className="hover:border-green-400 transition-colors cursor-pointer">
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 rounded-lg bg-green-100 dark:bg-green-900">
@@ -166,7 +166,7 @@ export function Dashboard() {
         </Link>
 
         <Link to="/bridge/chains">
-          <Card className="hover:border-violet-400 transition-colors cursor-pointer">
+          <Card className="hover:border-blue-400 transition-colors cursor-pointer">
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900">
@@ -183,8 +183,8 @@ export function Dashboard() {
       </div>
 
       {/* Analytics Tabs */}
-      <div className="border-b">
-        <nav className="flex gap-1 -mb-px overflow-x-auto">
+      <div className="border-b -mx-4 px-4 sm:mx-0 sm:px-0">
+        <nav className="flex gap-1 -mb-px overflow-x-auto scrollbar-hide">
           {analyticsTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -194,14 +194,15 @@ export function Dashboard() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
+                  'flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
                   isActive
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/50'
                 )}
               >
-                <Icon className="h-4 w-4" />
-                {tab.label}
+                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline sm:inline">{tab.label}</span>
+                <span className="xs:hidden">{tab.label.split(' ')[0]}</span>
               </button>
             );
           })}

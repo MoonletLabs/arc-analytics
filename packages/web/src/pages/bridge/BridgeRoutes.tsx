@@ -37,10 +37,10 @@ export function BridgeRoutes() {
 
   const getHeatmapColor = (count: number) => {
     const intensity = count / maxCount;
-    if (intensity > 0.75) return 'bg-violet-600 text-white';
-    if (intensity > 0.5) return 'bg-violet-500 text-white';
-    if (intensity > 0.25) return 'bg-violet-400';
-    if (intensity > 0) return 'bg-violet-300';
+    if (intensity > 0.75) return 'bg-blue-600 text-white';
+    if (intensity > 0.5) return 'bg-blue-500 text-white';
+    if (intensity > 0.25) return 'bg-blue-400';
+    if (intensity > 0) return 'bg-blue-300';
     return 'bg-muted';
   };
 
@@ -144,7 +144,7 @@ export function BridgeRoutes() {
                       <div
                         className={`px-3 py-1 rounded-md text-sm font-medium ${
                           route.sourceChain === 'arc_testnet'
-                            ? 'bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300'
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                             : 'bg-muted'
                         }`}
                       >
@@ -154,7 +154,7 @@ export function BridgeRoutes() {
                       <div
                         className={`px-3 py-1 rounded-md text-sm font-medium ${
                           route.destChain === 'arc_testnet'
-                            ? 'bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300'
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                             : 'bg-muted'
                         }`}
                       >
