@@ -13,6 +13,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { Logo } from '@/components/ui/Logo';
 
 interface LayoutProps {
   children: ReactNode;
@@ -51,11 +52,7 @@ export function Layout({ children }: LayoutProps) {
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
           <Link to="/" className="flex items-center space-x-2 mr-8">
-            <div className="flex items-center gap-1">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">A</span>
-              </div>
-            </div>
+            <Logo size={32} />
             <span className="font-bold text-lg">Arc Analytics</span>
           </Link>
 
